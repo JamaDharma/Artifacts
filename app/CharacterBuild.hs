@@ -103,18 +103,12 @@ offpieceBuilds extractor setA offA = concatMap sequence variants where
   off p = filter ((/=p).pieceT) setP ++ filter ((==p).pieceT) offP
   variants = setP:map (sortOn pieceT.off.pieceT) offP
 
-damage :: [Artifact]->Double
-damage = damageWithBuff []
-
-damageWithBuff :: [(Stat,Double)]->Build->Double
-damageWithBuff = dmgClc furina
-
 maxDamage :: Character->[Build]->Double
 maxDamage c = maximum.map (dmgClc c [])
 
-calcStatWeights :: [Build] -> [(Stat, Double)] -> [(Stat, Double)]
-calcStatWeights builds = map updateW where
-    maxDmg buff = maximum.map bdc $ builds where bdc = damageWithBuff buff
+calcStatWeights :: Character -> [Build] -> [(Stat, Double)] -> [(Stat, Double)]
+calcStatWeights crctr builds = map updateW where
+    maxDmg buff = maximum.map bdc $ builds where bdc = dmgClc crctr buff
     bd = maxDmg []
     --34 is 4 avg rolls so 25 as 100/4 to get % per roll
     newWeight s =  maxDmg [statRollToValue (s,34)]/bd*25 - 25

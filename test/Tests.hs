@@ -16,7 +16,6 @@ import CharacterBuild
       extendWeights,
       calcStatWeightsC,
       bestBuildStrategic,
-      damage,
       updateWeights )
 import Progression
 import Generator
@@ -47,7 +46,7 @@ testSuite = [
               --checkPareto,
 
               --testMinimisation
-              --testMyFurina,
+              --testMyFurina, testMyNefer
               testUpgradeSimulator
               --measureProgression
               --testWeightProgression
@@ -319,10 +318,19 @@ compareX = do
 testMyFurina :: IO Bool
 testMyFurina = do
     furinaA <- readGOOD "data/furina.json"
-    let dmg = damage furinaA
+    let dmg = dmgClc furina [] furinaA
     print dmg
     let result = abs (dmg - 28129)<1
     printResult "My Furina Damage" result
+    return result
+
+testMyNefer :: IO Bool
+testMyNefer = do
+    neferA <- readGOODForCharacter "data/Main_2026-02-03_11-27-42.json" "Nefer"
+    let dmg = dmgClc nefer [] neferA
+    print dmg
+    let result = abs (dmg - 28129)<1
+    printResult "My Nefer Damage" result
     return result
 
 --fail 10, 46 fails 15 too
@@ -331,7 +339,7 @@ furinaFailureSeeds = [46,98,113,194,241,299,323,351,449,496]
 testFurinaInForest :: IO Bool
 testFurinaInForest = do
     furinaA <- readGOOD "data/furina.json"
-    let dmg = damage furinaA
+    let dmg = dmgClc furina [] furinaA
     let splitArts = partition ((=="GoldenTroupe").set) furinaA
     let stW = zip (scaling furina) [1,1..]
     let pf  =  paretoFilter furina
@@ -340,7 +348,7 @@ testFurinaInForest = do
     let bm3 s o = [bestBuild 7 furina s o]
     --let bm2 sp op = bm (pf sp) (pf op)
 
-    let dfs = buildsFromSeed damage (fst splitArts) (snd splitArts) 10000 bm3
+    let dfs = buildsFromSeed (dmgClc furina []) (fst splitArts) (snd splitArts) 10000 bm3
     let failureSeeds = go 0 0 where
         go count seed
           | count >= 10 = return []

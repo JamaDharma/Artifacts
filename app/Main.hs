@@ -72,10 +72,12 @@ weightsIteration sz onA offA (n,oW) = do
   putStrLn $ weightsToString oW
   let bb = best4pcBuilds oW sz onA offA
   prntBestBuilds 3 bb
-  return (n+1,calcStatWeights bb oW)
+  return (n+1,calcStatWeights char bb oW)
 
 char :: Character
-char = furina --this is global current char
+char = nefer --this is global current char
+damage :: Build -> Double
+damage = dmgClc char []
 
 makeDataset :: Character -> (Int,Color,[(Int, Build)]) -> (String, Color, [(Int, Double, [String])])
 makeDataset c (indexLabel,clr,lst) = (show indexLabel,clr,map makePoint lst)
