@@ -55,10 +55,13 @@ getShownStat c arts s
   | otherwise = error ("Invalid stat" ++ show s)
   where statline = getShowStatline c arts
 
-simpleMult :: (Stat->Double) -> Double
-simpleMult sl = critMlt*dmgMlt where
+critMult :: (Stat->Double) -> Double
+critMult sl = critMlt where
   eCR = max 0 (min 100 (sl CR))/100
   critMlt = 1 + eCR*sl CD/100
+
+simpleMult :: (Stat->Double) -> Double
+simpleMult sl = critMult sl*dmgMlt where
   dmgMlt = 1 + sl DMG/100
 
 getScalingStatline :: Character->Artifact->Array Stat Double
@@ -131,5 +134,4 @@ neferStatlineDmgClc _ = innerDmg where
     scalingDmg = talentMV*totalEM*reactionMult*lunarBloomBaseMult
     dmgBeforeCrit = scalingDmg + flatDmgIncrease
     
-    critMult = simpleMult sl  -- reuse Furina's crit multiplier function
-    finalDmg = dmgBeforeCrit * critMult
+    finalDmg = dmgBeforeCrit * critMult sl
