@@ -1,7 +1,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module ImportGOOD (readGOOD,writeGOOD) where
+module ImportGOOD (readGOOD,writeGOOD,readGOODForCharacter) where
 
 import ArtifactType
 import RollProbability
@@ -125,3 +125,12 @@ encodeGOOD arts = encode JSONGOOD
 -- Write list of Artifact to file as json in GOOD format
 writeGOOD :: String -> [Artifact] -> IO ()
 writeGOOD filePath arts = BS.writeFile filePath (encodeGOOD arts)
+
+filterByCharacter :: String -> [JSONArtifact] -> [Artifact]
+filterByCharacter charName = map jsonToArtifact . filter ((== charName) . location)
+
+readGOODForCharacter :: String -> String -> IO [Artifact]
+readGOODForCharacter filePath charName = do
+  jsonString <- BS.readFile filePath
+  let good = fromJust.decode $ jsonString
+  return $ filterByCharacter charName (artifacts good)

@@ -4,7 +4,7 @@ import ArtifactType
 import Data.List (permutations,partition)
 import Data.List.Extra
 import Data.Array ((!), Array, listArray, array)
-import Character ( Character(dmgClc, scaling), furina )
+import Character ( Character(name, dmgClc, scaling), furina, nefer )
 import CharacterBuild
     ( BuildStrategy(BuildStrategy, weightCalculator, character,
                     buildMaker),
@@ -78,16 +78,17 @@ measureProgression = do
 
 -- In Tests.hs, add this function:
 testUpgradeSimulator :: IO Bool
-testUpgradeSimulator = do
-  putStrLn "Loading Furina build..."
-  artifacts <- readGOOD "data/furina.json"
-  putStrLn $ "Loaded " ++ show (length artifacts) ++ " artifacts"
-  
-  results <- simulateUpgrades furina artifacts 1000000
-  
-  putStrLn "\nUpgrade frequency:"
-  mapM_ (\(p, c) -> putStrLn $ show p ++ ": " ++ show c) results
-  return True
+testUpgradeSimulator = go nefer where
+  go chr = do
+    putStrLn ("Loading "++name chr++" build...")
+    artifacts <- readGOODForCharacter "data/Main_2026-02-03_11-27-42.json" (name chr)
+    putStrLn $ "Loaded " ++ show (length artifacts) ++ " artifacts"
+
+    results <- simulateUpgrades chr artifacts 1000000
+
+    putStrLn "\nUpgrade frequency:"
+    mapM_ (\(p, c) -> putStrLn $ show p ++ ": " ++ show c) results
+    return True
 
 checkPartitionig :: IO Bool
 checkPartitionig = do
@@ -212,7 +213,7 @@ testMinimisation = do
       subs = substitution dr dr2 scaling
       solA = solutionA subs dmgCorrection
       oc = calcOtherChanges dr dr2 (fst subs)
-      calcChange s = (s,change $ oc s) 
+      calcChange s = (s,change $ oc s)
         where change (c,m) = snd solA*m+c
       res = map calcChange.filter (/=fst subs)$scaling
 
