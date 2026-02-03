@@ -5,7 +5,7 @@ module Character(
   getFinalStatline,
   getScalingStatline,
   conditionChecker,
-  Statline, statAccessor, statDecorator, collectStats, appendStats
+  Statline, statAccessor, statDecorator, collectStats, appendStats, nefer
 ) where
 
 import ArtifactType
@@ -99,3 +99,37 @@ furinaStatlineDmgClc c = innerDmg where
   innerDmg sl = dmgOutput  where
     effHp = sl HPf+baseHP*(1+sl HP/100)
     dmgOutput = effHp*baseMV*simpleMult sl
+
+nefer :: Character
+nefer = Character{
+   name = "Nefer",
+   scaling = [EM, CR, CD],
+   baseS  = baseStats [],  -- no base stats needed (EM/CR/CD don't use them)
+   displS = [(EM, 100+80), (CR, 5+30), (CD, 50+38.4+55.1)],
+   -- 100 char EM, 80 artifact set (2pc), 5% base CR, 30% artifact set (4pc), 
+   -- 50% base CD, 38.4% char, 55.1% weapon
+   bonusS = [(EM, 100+450), (CR, 10), (CD, 20)],
+   -- 100 Nefer talent (conditional), 450 team EM, 
+   -- 10% Lunar-Bloom CR, 20% Lunar-Bloom CD
+   condition = [],  -- no stat requirements
+   dmgClc = characterDamageCalculator nefer,
+   stDmgClc = neferStatlineDmgClc nefer
+}
+
+neferStatlineDmgClc :: Character -> ((Stat->Double)->Double)
+neferStatlineDmgClc _ = innerDmg where
+  talentMV = 1.728*(1+3*0.08) -- with bonus
+  lunarBloomDmgBonus = 0.746  -- 74.6% from team
+  lunarBloomBaseMult = 1+0.35   -- 35% from team
+  flatDmgIncrease = 5030.0    -- from Lauma (roughly constant, depends on Lauma stats)
+  
+  innerDmg sl = finalDmg where
+    totalEM = sl EM
+    transformativeBonus = 6 * totalEM / (totalEM + 2000)
+    reactionMult = 1 + transformativeBonus + lunarBloomDmgBonus
+    
+    scalingDmg = talentMV*totalEM*reactionMult*lunarBloomBaseMult
+    dmgBeforeCrit = scalingDmg + flatDmgIncrease
+    
+    critMult = simpleMult sl  -- reuse Furina's crit multiplier function
+    finalDmg = dmgBeforeCrit * critMult
