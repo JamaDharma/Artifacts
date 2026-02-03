@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Load Chart Data from File</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        canvas {
+            width: 80%;
+            height: 80%;
+            margin: 20px auto;
+            display: block;
+            border: 1px solid #ccc;
+        }
+        #fileInput {
+            margin-left: auto;
+            margin-right: auto;
+            display: block;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <input type="file" id="fileInput" accept=".json">
+    <canvas id="myChart"></canvas>
+    <script>
+    const fileInput = document.getElementById('fileInput');
+    const ctx = document.getElementById('myChart').getContext('2d');
+    let myChart = null; // To store the chart instance
+
+    fileInput.addEventListener('change', handleFileSelect);
+
+    function handleFileSelect(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+
+        reader.onload = function(event) {
+            try {
+                const jsonData = JSON.parse(event.target.result);
+                renderChart(jsonData);
+            } catch (error) {
+                console.error('Error parsing JSON data:', error);
+                alert('Invalid JSON file. Please select a valid JSON file.');
+            }
+        };
+
+        reader.onerror = function(event) {
+            console.error('Error reading file:', event);
+            alert('Error reading file. Please try again.');
+        };
+
+        reader.readAsText(file);
+    }
+
+    function renderChart(jsonData) {
+        // If a chart already exists, destroy it before creating a new one
+        if (myChart) {
+            myChart.destroy();
+        }
+
+        try {
+            myChart = new Chart(ctx, {
+                type: 'line',
+                data: jsonData,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    scales: {
+                        x: { type: 'logarithmic', position: 'bottom' },
+                        y: { type: 'logarithmic', position: 'left' }
+                    },
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const point = context.dataset.data[context.dataIndex];
+                                    if (Array.isArray(point.text)) {
+                                        return [
+                                            `(${point.x}, ${Math.round(point.y)}) - ${context.dataset.label}`,
+                                            ...point.text
+                                        ];
+                                    } else {
+                                        return `(${point.x}, ${point.y}) - ${context.dataset.label}: ${point.text}`;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        } catch (error) {
+            console.error('Error creating chart:', error);
+            alert('Error creating chart.  Check the console for data format.');
+        }
+    }
+    </script>
+</body>
+</html>

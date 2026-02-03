@@ -1,0 +1,13 @@
+# Build artifacts
+dist/
+dist-*
+dist-newstyle/
+
+# Caches and temporary files
+.cabal-sandbox/
+cabal.sandbox.config
+.ghc.environment.*
+
+# Common OS junk
+.DS_Store
+Thumbs.db
