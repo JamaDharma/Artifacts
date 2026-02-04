@@ -77,16 +77,22 @@ measureProgression = do
 
 -- In Tests.hs, add this function:
 testUpgradeSimulator :: IO Bool
-testUpgradeSimulator = go nefer where
-  go chr = do
+testUpgradeSimulator = go nefer 1000000 where
+  pairsToDays :: Int -> Double
+  pairsToDays n = fromIntegral n*40/180 --180 resin per day, 40 resin per artifact pair
+  printInfo :: Double -> (Piece, Int) -> IO ()
+  printInfo int (p,c) = putStrLn $ show p ++ ": " ++ show c ++ " (" ++ printf "%.0f" (int / fromIntegral (c+1)) ++ " days)"
+  go chr cnt= do
+    let interval = pairsToDays cnt
     putStrLn ("Loading "++name chr++" build...")
     artifacts <- readGOODForCharacter "data/Main_2026-02-03_11-27-42.json" (name chr)
     putStrLn $ "Loaded " ++ show (length artifacts) ++ " artifacts"
 
-    results <- simulateUpgrades chr artifacts 1000000
+    results <- simulateUpgrades chr artifacts cnt
 
     putStrLn "\nUpgrade frequency:"
-    mapM_ (\(p, c) -> putStrLn $ show p ++ ": " ++ show c) results
+
+    mapM_ (printInfo interval) results
     return True
 
 checkPartitionig :: IO Bool
