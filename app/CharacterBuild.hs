@@ -4,7 +4,7 @@ import ArtifactType
 import Character
 import Data.Ord (comparing, Down(..))
 import Data.Array
-import Data.List (maximumBy, minimumBy)
+import Data.List (maximumBy, minimumBy, foldl')
 import Data.List.Extra (sortOn, groupSortOn, maximumOn)
 
 type ArtifactStorage = ([Artifact], [Artifact])
@@ -77,6 +77,41 @@ paretoFilter c = concatMap (paretoFront c).groupSortOn piece
 paretoFilterReal :: Character -> [Artifact] -> [Artifact]
 paretoFilterReal c = concatMap (pf.reverse.pf).elems.partitionOnPieceR piece
   where pf = paretoCandidatesOn c id
+
+-- 1. Recursive helper that accumulates Statline
+foldRecursivelyS :: ((Build, Statline) -> a -> a) -> Statline -> a -> [[Artifact]] -> Build -> a
+foldRecursivelyS f sl acc [] currentStack = f (currentStack, sl) acc
+foldRecursivelyS f sl acc (candidates:rest) currentStack =
+  foldl' processCandidate acc candidates
+  where
+    processCandidate acc' candidate =
+      -- Optimization: Accumulate stats incrementally
+      let newSL = appendStats sl (stats candidate) 
+      in foldRecursivelyS f newSL acc' rest (candidate:currentStack)
+
+-- 2. Generic traversal (Fixes the type error by supplying [])
+foldOffpieceBuildsS :: ([Artifact] -> [[Artifact]]) -> Character -> ((Build, Statline) -> a -> a) -> a -> [Artifact] -> [Artifact] -> a
+foldOffpieceBuildsS extractor c callback initialAcc setA offA =
+    foldl' processVariant initialAcc variants
+  where
+    -- Pre-calculate base stats once
+    baseSL = collectStats (displS c ++ bonusS c)
+    
+    pieceT = piece.head
+    setP = extractor setA
+    offP = extractor offA
+    
+    -- Logic to create variant layers
+    off p = filter ((/=p).pieceT) setP ++ filter ((==p).pieceT) offP
+    variants = setP : map (sortOn pieceT . off . pieceT) offP
+
+    -- FIX: This helper supplies the empty Build [] to start recursion for each variant
+    processVariant acc layers = foldRecursivelyS callback baseSL acc layers []
+
+-- 3. The main function
+fold4pcBuilds :: Character -> ((Build,Statline) -> a -> a) -> a -> [(Stat,Double)] -> Int -> [Artifact] -> [Artifact] -> a
+fold4pcBuilds c callback initialAcc rollW n = 
+    foldOffpieceBuildsS (bestPieces rollW n) c callback initialAcc
 
 best4pcBuilds :: [(Stat,Double)]->Int->[Artifact]->[Artifact]->[Build]
 best4pcBuilds rollW n = offpieceBuilds (bestPieces rollW n)
@@ -258,3 +293,69 @@ bestBuild n c setA offA  =  bb where
       newSW = calcStatWeightsB c oldBuilds oldSW
       newBuilds = bmkr newSW
       newMax = maxBy dmg newBuilds
+
+-- The state we carry through the fold
+data OptState = OptState 
+  { bestB :: !Build           -- The absolute best build so far
+  , maxD  :: !Double          -- Damage of bestB
+  , maxSens :: ![(Stat, Double)] -- Max damage found for (+Stat) scenarios
+  , minSens :: ![(Stat, Double)] -- Max damage found for (-Stat) scenarios
+  }
+
+-- Helper to create an empty state
+initialOptState :: Character -> OptState
+initialOptState c = OptState [] 0.0 zeroes zeroes
+  where zeroes = map (\s -> (s, 0.0)) (scaling c)
+
+bestBuildFolding :: Int -> Character -> [Artifact] -> [Artifact] -> Build
+bestBuildFolding n c setA offA = bb
+  where
+    -- 1. Setup constants and helpers
+    calc sla = if conditionChecker c sla then stDmgClc c sla else 0
+    scaleStats = scaling c
+    
+    -- This is the callback run at every single leaf (Build)
+    -- It updates the Global Max and the Sensitivity Maxes
+    optimizer :: (Build, Statline) -> OptState -> OptState
+    optimizer (b, sl) (OptState bb md maxS minS) = 
+        OptState newBB newMD newMaxS newMinS
+      where
+        dmg = calc (statAccessor sl)
+        
+        -- Update Best Build
+        (newBB, newMD) = if dmg > md then (b, dmg) else (bb, md)
+        
+        -- Check Sensitivity: 
+        -- What if this build had +17 (approx 2 rolls) of Stat X?
+        -- We track the theoretical MAX damage available for that scenario.
+        updateSens (s, currentMax) = (s, max currentMax (calc (dec s 17)))
+        updateSensMin (s, currentMax) = (s, max currentMax (calc (dec s (-17))))
+        
+        -- Decorator helper: temporarily add val to stat s
+        dec s val = statDecorator sl (statRollToValue (s, val))
+
+        newMaxS = map updateSens maxS
+        newMinS = map updateSensMin minS
+
+    -- 2. The Loop
+    go :: OptState -> [(Stat, Double)] -> Build
+    go oldState oldWeights = 
+        if newMax > oldMax+00 -- Stop if improvement is negligible
+        then go newState newWeights
+        else bestB newState
+      where
+        oldMax = maxD oldState
+        
+        -- RUN THE FOLD (The heavy lifting happens here)
+        newState = fold4pcBuilds c optimizer (initialOptState c) (extendWeights c oldWeights) n setA offA
+        newMax = maxD newState
+        
+        -- Calculate new weights based on the data we just collected
+        -- Formula: (MaxWithPlus - MaxWithMinus) / BaseMax
+        newWeights = zipWith calcW (maxSens newState) (minSens newState)
+        calcW (s, plusDmg) (_, minusDmg) = 
+             (s, (plusDmg - minusDmg) / newMax * 25) -- *25 is arbitrary scaling factor
+
+    -- 3. Kickoff
+    startWeights = zip scaleStats [1,1..]
+    bb = go (initialOptState c) startWeights

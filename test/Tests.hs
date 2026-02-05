@@ -4,15 +4,17 @@ import ArtifactType
 import Data.List (permutations,partition)
 import Data.List.Extra
 import Data.Array ((!), Array, listArray, array)
-import Character ( Character(name, dmgClc, scaling), furina, nefer )
+import Character ( Character(name, dmgClc, scaling, stDmgClc), furina, nefer, statAccessor )
 import CharacterBuild
     ( BuildStrategy(BuildStrategy, weightCalculator, character,
                     buildMaker),
       bestBuild,
+      bestBuildFolding,
       partitionOnPiece,
       paretoFilter,
       paretoFilterReal,
       best4pcBuilds,
+      fold4pcBuilds,
       extendWeights,
       calcStatWeightsC,
       bestBuildStrategic,
@@ -47,8 +49,9 @@ testSuite = [
 
               --testMinimisation
               --testMyFurina, testMyNefer
-              testUpgradeSimulator
-              --measureProgression
+              --testUpgradeSimulator
+              --foldingBestBuilds
+              measureProgression
               --testWeightProgression
               --measureAndRecordX
               --compareX
@@ -62,18 +65,40 @@ generateArts n = withDeterministicRandom n $ do
   offArts <- generateArtifacts "MS" 10000
   return (setArts, offArts)
 
---13.8s 13s 12.7s 10s 7s 6.5s
+--13.8s 13s 12.7s 10s 7s 6.5s 7.7s
 measureProgression :: IO Bool
 measureProgression = do
     (setArts, offArts) <- generateArts 1
     (t, prg) <- whileMeasuringTime $ do
-      let prg = progression furina (bestBuild 7) setArts offArts
+      let prg = progression furina (bestBuildFolding 7) setArts offArts
+      --let prg = progression furina (bestBuild 7) setArts offArts
       putStrLn$ "AllBuilds: "++show (length prg)
       return prg
     print.map fst $ prg
     putStrLn.unwords.map (printf "%6.1f").analitics (dmgClc furina [])$prg
     print t
     return True
+
+topBuilds :: Character -> Int -> [Build] -> [Double]
+topBuilds chr cnt = take cnt.reverse.sort.map (dmgClc chr [])
+foldingBestBuilds :: IO Bool
+foldingBestBuilds = do
+    setArts <- generateArtifacts "GT" 10000
+    offArts <- generateArtifacts "MS" 10000
+    let ttb = topBuilds furina 10
+    let ecsldc sl = if asr ER < 200 then 0 else stDmgClc furina asr where asr = statAccessor sl
+    let rollW = extendWeights furina.zip (scaling furina)$[1,1..]
+    let bldNrm = best4pcBuilds rollW 7 setArts offArts
+    let acc (b,s) a = b:a
+    let foldBlld = fold4pcBuilds furina acc [] rollW 7 setArts offArts
+    let vld (b,s) a = a && (abs (dmgClc furina [] b - ecsldc s) < 0.1)
+    let valid = fold4pcBuilds furina vld True rollW 7 setArts offArts
+    print $ length bldNrm
+    print (ttb bldNrm)
+    print $ length foldBlld
+    print (ttb foldBlld)
+
+    return valid
 
 -- In Tests.hs, add this function:
 testUpgradeSimulator :: IO Bool

@@ -1,0 +1,158 @@
+	Wed Feb  4 22:03 2026 Time and Allocation Profiling Report  (Final)
+
+	   Artifacts-test.exe +RTS -p -RTS
+
+	total time  =        0.88 secs   (881 ticks @ 1000 us, 1 processor)
+	total alloc = 18,574,076,304 bytes  (excludes profiling overheads)
+
+COST CENTRE        MODULE         SRC                                   %time %alloc
+
+foldRecursivelyS   CharacterBuild app\CharacterBuild.hs:(83,1)-(90,68)   49.9   59.3
+furina             Character      app\Character.hs:(85,1)-(95,1)         18.4    8.7
+conditionChecker   Character      app\Character.hs:75:1-65                8.9    0.0
+statDecorator      Character      app\Character.hs:(30,1)-(32,23)         7.9    9.9
+appendStats        Character      app\Character.hs:36:1-25                4.5    9.5
+stDmgClc           Character      app\Character.hs:23:5-12                3.3    1.7
+statRollToValue    ArtifactType   app\ArtifactType.hs:33:1-44             2.0    1.7
+statAccessor       Character      app\Character.hs:28:1-20                1.5    2.0
+generateArtifacts  Generator      app\Generator.hs:76:1-70                1.2    2.2
+getScalingStatline Character      app\Character.hs:(68,1)-(72,29)         0.9    3.7
+
+
+                                                                                                                           individual      inherited
+COST CENTRE                  MODULE                      SRC                                            no.     entries  %time %alloc   %time %alloc
+
+MAIN                         MAIN                        <built-in>                                     423           0    0.0    0.0   100.0  100.0
+ CAF                         Text.Printf                 <entire-module>                                709           0    0.0    0.0     0.0    0.0
+ CAF                         GHC.Read                    <entire-module>                                685           0    0.0    0.0     0.0    0.0
+ CAF                         GHC.IO.StdHandles           <entire-module>                                669           0    0.0    0.0     0.0    0.0
+ CAF                         GHC.IO.Handle.FD            <entire-module>                                663           0    0.0    0.0     0.0    0.0
+ CAF                         GHC.IO.Encoding.CodePage    <entire-module>                                651           0    0.0    0.0     0.0    0.0
+ CAF                         GHC.IO.Encoding             <entire-module>                                650           0    0.0    0.0     0.0    0.0
+ CAF                         GHC.Float                   <entire-module>                                637           0    0.0    0.0     0.0    0.0
+ CAF                         System.Random.SplitMix.Init <entire-module>                                523           0    0.0    0.0     0.0    0.0
+  initialSeed                System.Random.SplitMix.Init src\System\Random\SplitMix\Init.hs:40:1-26     860           1    0.0    0.0     0.0    0.0
+ CAF                         Weights                     <entire-module>                                466           0    0.0    0.0     0.0    0.0
+  circletMSW                 Weights                     app\Weights.hs:21:1-71                         876           1    0.0    0.0     0.0    0.0
+  gobletMSW                  Weights                     app\Weights.hs:25:1-75                         878           1    0.0    0.0     0.0    0.0
+  pieceMSW                   Weights                     app\Weights.hs:(27,1)-(33,5)                   873           1    0.0    0.0     0.0    0.0
+  pieceWeight                Weights                     app\Weights.hs:7:1-69                          866           1    0.0    0.0     0.0    0.0
+  sandsMSW                   Weights                     app\Weights.hs:23:1-69                         877           1    0.0    0.0     0.0    0.0
+  substatUpgradeNumW         Weights                     app\Weights.hs:10:1-34                         875           1    0.0    0.0     0.0    0.0
+  substatWeight              Weights                     app\Weights.hs:(13,1)-(17,5)                   874           1    0.0    0.0     0.0    0.0
+ CAF                         System.Random.SplitMix      <entire-module>                                465           0    0.0    0.0     0.0    0.0
+  initSMGen                  System.Random.SplitMix      src\System\Random\SplitMix.hs:375:1-36         858           1    0.0    0.0     0.0    0.0
+ CAF                         System.Random.Internal      <entire-module>                                440           0    0.0    0.0     0.0    0.0
+  mkStdGen                   System.Random.Internal      src\System\Random\Internal.hs:583:1-45         870           1    0.0    0.0     0.0    0.0
+  theStdGen                  System.Random.Internal      src\System\Random\Internal.hs:587:1-64         857           1    0.0    0.0     0.0    0.0
+   initSMGen                 System.Random.SplitMix      src\System\Random\SplitMix.hs:375:1-36         859           0    0.0    0.0     0.0    0.0
+ CAF                         Generator                   <entire-module>                                439           0    0.0    0.0     0.0    0.0
+ CAF                         Progression                 <entire-module>                                438           0    0.0    0.0     0.0    0.0
+  progression                Progression                 app\Progression.hs:(44,1)-(84,52)              881           0    0.0    0.0     0.0    0.0
+   partitionOnPiece          CharacterBuild              app\CharacterBuild.hs:30:1-48                  882           1    0.0    0.0     0.0    0.0
+    partitionOnPieceR        CharacterBuild              app\CharacterBuild.hs:27:1-84                  884           1    0.0    0.0     0.0    0.0
+ CAF                         CharacterBuild              <entire-module>                                436           0    0.0    0.0     0.0    0.0
+  bestBuild                  CharacterBuild              app\CharacterBuild.hs:(292,1)-(342,44)         924           0    0.0    0.0     0.0    0.0
+  bestPieces                 CharacterBuild              app\CharacterBuild.hs:(68,1)-(72,56)           909           0    0.0    0.0     0.0    0.0
+   partitionOnPiece          CharacterBuild              app\CharacterBuild.hs:30:1-48                  910           1    0.0    0.0     0.0    0.0
+    partitionOnPieceR        CharacterBuild              app\CharacterBuild.hs:27:1-84                  912           1    0.0    0.0     0.0    0.0
+ CAF                         Character                   <entire-module>                                432           0    0.0    0.0     0.0    0.0
+  appendStats                Character                   app\Character.hs:36:1-25                       933           1    0.0    0.0     0.0    0.0
+  collectStats               Character                   app\Character.hs:34:1-47                       920           1    0.0    0.0     0.0    0.0
+  furina                     Character                   app\Character.hs:(85,1)-(95,1)                 889           1    0.0    0.0     0.0    0.0
+   baseS                     Character                   app\Character.hs:18:5-9                        942           1    0.0    0.0     0.0    0.0
+   baseStats                 ArtifactType                app\ArtifactType.hs:15:1-26                    901           0    0.0    0.0     0.0    0.0
+  statAccessor               Character                   app\Character.hs:28:1-20                       918           1    0.0    0.0     0.0    0.0
+ CAF                         ArtifactType                <entire-module>                                431           0    0.0    0.0     0.0    0.0
+  baseStats                  ArtifactType                app\ArtifactType.hs:15:1-26                    898           1    0.0    0.0     0.0    0.0
+  flatMap                    ArtifactType                app\ArtifactType.hs:26:1-57                    897           1    0.0    0.0     0.0    0.0
+   baseStats                 ArtifactType                app\ArtifactType.hs:15:1-26                    899           0    0.0    0.0     0.0    0.0
+  mainStatValue              ArtifactType                app\ArtifactType.hs:(38,1)-(42,29)             893           1    0.0    0.0     0.0    0.0
+ CAF                         Main                        <entire-module>                                430           0    0.0    0.0     0.0    0.0
+  main                       Main                        test\Tests.hs:(35,1)-(40,22)                   846           1    0.0    0.0     0.0    0.0
+  measureProgression         Main                        test\Tests.hs:(69,1)-(78,15)                   849           1    0.0    0.0     0.0    0.0
+   dmgClc                    Character                   app\Character.hs:22:5-10                       951           1    0.0    0.0     0.0    0.0
+    furina                   Character                   app\Character.hs:(85,1)-(95,1)                 952           0    0.0    0.0     0.0    0.0
+     bonusS                  Character                   app\Character.hs:20:5-10                       958           1    0.0    0.0     0.0    0.0
+     displS                  Character                   app\Character.hs:19:5-10                       957           1    0.0    0.0     0.0    0.0
+     stDmgClc                Character                   app\Character.hs:23:5-12                       960           1    0.0    0.0     0.0    0.0
+   generateArts              Main                        test\Tests.hs:(62,1)-(65,27)                   852           1    0.0    0.0     0.0    0.0
+    withDeterministicRandom  GeneratorUtils              test\GeneratorUtils.hs:(25,1)-(31,15)          853           1    0.0    0.0     0.0    0.0
+  testSuite                  Main                        test\Tests.hs:(43,1)-(59,13)                   848           1    0.0    0.0     0.0    0.0
+  generateArts               Main                        test\Tests.hs:(62,1)-(65,27)                   862           0    0.0    0.0     0.0    0.0
+   withDeterministicRandom   GeneratorUtils              test\GeneratorUtils.hs:(25,1)-(31,15)          863           0    0.0    0.0     0.0    0.0
+    generateArtifacts        Generator                   app\Generator.hs:76:1-70                       864           2    0.0    0.0     0.0    0.0
+ main                        Main                        test\Tests.hs:(35,1)-(40,22)                   847           0    0.0    0.0   100.0  100.0
+  testSuite                  Main                        test\Tests.hs:(43,1)-(59,13)                   850           0    0.0    0.0   100.0  100.0
+   measureProgression        Main                        test\Tests.hs:(69,1)-(78,15)                   851           0    0.0    0.0   100.0  100.0
+    analitics                Progression                 app\Progression.hs:(13,1)-(14,82)              950           1    0.0    0.0     0.0    0.0
+    whileMeasuringTime       GeneratorUtils              test\GeneratorUtils.hs:(16,1)-(21,27)          879           1    0.0    0.0    98.5   97.1
+     progression             Progression                 app\Progression.hs:(44,1)-(84,52)              880           1    0.0    0.0    98.5   97.1
+      bestBuild              CharacterBuild              app\CharacterBuild.hs:(292,1)-(342,44)         902          37    0.0    0.0    97.2   92.9
+       maxD                  CharacterBuild              app\CharacterBuild.hs:281:5-8                  904         150    0.0    0.0     0.0    0.0
+       fold4pcBuilds         CharacterBuild              app\CharacterBuild.hs:(113,1)-(114,66)         905          75    0.0    0.0    97.2   92.9
+        bestPieces           CharacterBuild              app\CharacterBuild.hs:(68,1)-(72,56)           907          75    0.0    0.0     0.0    0.0
+         statValueToRoll     ArtifactType                app\ArtifactType.hs:35:1-44                    925         450    0.0    0.0     0.0    0.0
+         collectStats        Character                   app\Character.hs:34:1-47                       921           0    0.0    0.0     0.0    0.0
+        foldOffpieceBuildsS  CharacterBuild              app\CharacterBuild.hs:(94,1)-(109,78)          906          75    0.0    0.0    97.2   92.9
+         foldRecursivelyS    CharacterBuild              app\CharacterBuild.hs:(83,1)-(90,68)           915     7369603   49.9   59.3    97.0   92.8
+          conditionChecker   Character                   app\Character.hs:75:1-65                       930    38873704    8.9    0.0    14.0    3.3
+           condition         Character                   app\Character.hs:21:5-13                       931    38873704    0.5    0.0     0.5    0.0
+           statDecorator     Character                   app\Character.hs:(30,1)-(32,23)                947    32562130    3.7    2.8     3.7    2.8
+           statAccessor      Character                   app\Character.hs:28:1-20                       932           0    0.9    0.5     0.9    0.5
+          statRollToValue    ArtifactType                app\ArtifactType.hs:33:1-44                    946    32562130    2.0    1.7     2.0    1.7
+          stDmgClc           Character                   app\Character.hs:23:5-12                       939    19612088    3.3    1.7    26.4   18.9
+           furina            Character                   app\Character.hs:(85,1)-(95,1)                 940           0   18.4    8.7    23.2   17.2
+            statDecorator    Character                   app\Character.hs:(30,1)-(32,23)                948    81806050    4.2    7.0     4.2    7.0
+            statAccessor     Character                   app\Character.hs:28:1-20                       941           0    0.6    1.4     0.6    1.4
+          stats              ArtifactType                app\ArtifactType.hs:48:5-9                     938     7369153    0.1    0.0     0.1    0.0
+          appendStats        Character                   app\Character.hs:36:1-25                       934           0    4.5    9.5     4.5    9.5
+         piece               ArtifactType                app\ArtifactType.hs:45:5-9                     929        6000    0.0    0.0     0.0    0.0
+         bonusS              Character                   app\Character.hs:20:5-10                       937          75    0.0    0.0     0.0    0.0
+         displS              Character                   app\Character.hs:19:5-10                       936          75    0.0    0.0     0.0    0.0
+         bestPieces          CharacterBuild              app\CharacterBuild.hs:(68,1)-(72,56)           908           0    0.1    0.1     0.1    0.1
+          artValue           CharacterBuild              app\CharacterBuild.hs:65:1-74                  916       36109    0.0    0.0     0.0    0.0
+           stats             ArtifactType                app\ArtifactType.hs:48:5-9                     917       36109    0.0    0.0     0.0    0.0
+           statAccessor      Character                   app\Character.hs:28:1-20                       928           0    0.0    0.0     0.0    0.0
+          partitionOnPiece   CharacterBuild              app\CharacterBuild.hs:30:1-48                  911           0    0.0    0.0     0.0    0.0
+           partitionOnPieceR CharacterBuild              app\CharacterBuild.hs:27:1-84                  913           0    0.0    0.0     0.0    0.0
+            piece            ArtifactType                app\ArtifactType.hs:45:5-9                     914       36109    0.0    0.0     0.0    0.0
+          statAccessor       Character                   app\Character.hs:28:1-20                       919           0    0.0    0.0     0.0    0.0
+         collectStats        Character                   app\Character.hs:34:1-47                       935           0    0.0    0.0     0.0    0.0
+       initialOptState       CharacterBuild              app\CharacterBuild.hs:(288,1)-(289,49)         903          74    0.0    0.0     0.0    0.0
+        scaling              Character                   app\Character.hs:17:5-11                       944          36    0.0    0.0     0.0    0.0
+       maxSens               CharacterBuild              app\CharacterBuild.hs:282:5-11                 943          38    0.0    0.0     0.0    0.0
+       minSens               CharacterBuild              app\CharacterBuild.hs:283:5-11                 945          38    0.0    0.0     0.0    0.0
+       bestB                 CharacterBuild              app\CharacterBuild.hs:280:5-9                  949          37    0.0    0.0     0.0    0.0
+       extendWeights         CharacterBuild              app\CharacterBuild.hs:(58,1)-(62,25)           922          37    0.0    0.0     0.0    0.0
+        baseS                Character                   app\Character.hs:18:5-9                        927          75    0.0    0.0     0.0    0.0
+        pcntToFlatW          ArtifactType                app\ArtifactType.hs:29:1-87                    926          75    0.0    0.0     0.0    0.0
+       scaling               Character                   app\Character.hs:17:5-11                       923          37    0.0    0.0     0.0    0.0
+      paretoCandidatesOn     CharacterBuild              app\CharacterBuild.hs:(33,1)-(41,32)           887           1    0.5    0.5     1.4    4.2
+       getScalingStatline    Character                   app\Character.hs:(68,1)-(72,29)                890      545645    0.9    3.7     0.9    3.7
+        baseS                Character                   app\Character.hs:18:5-9                        900      545645    0.0    0.0     0.0    0.0
+        scaling              Character                   app\Character.hs:17:5-11                       891      545645    0.0    0.0     0.0    0.0
+        stats                ArtifactType                app\ArtifactType.hs:48:5-9                     892      545645    0.0    0.0     0.0    0.0
+       scaling               Character                   app\Character.hs:17:5-11                       888           1    0.0    0.0     0.0    0.0
+      partitionOnPiece       CharacterBuild              app\CharacterBuild.hs:30:1-48                  883           0    0.0    0.0     0.0    0.0
+       partitionOnPieceR     CharacterBuild              app\CharacterBuild.hs:27:1-84                  885           0    0.0    0.0     0.0    0.0
+        piece                ArtifactType                app\ArtifactType.hs:45:5-9                     886       20000    0.0    0.0     0.0    0.0
+    dmgClc                   Character                   app\Character.hs:22:5-10                       953           0    0.0    0.0     0.0    0.0
+     furina                  Character                   app\Character.hs:(85,1)-(95,1)                 954           0    0.0    0.0     0.0    0.0
+      stats                  ArtifactType                app\ArtifactType.hs:48:5-9                     959         355    0.0    0.0     0.0    0.0
+      conditionChecker       Character                   app\Character.hs:75:1-65                       955          72    0.0    0.0     0.0    0.0
+       condition             Character                   app\Character.hs:21:5-13                       956          72    0.0    0.0     0.0    0.0
+      stDmgClc               Character                   app\Character.hs:23:5-12                       961           0    0.0    0.0     0.0    0.0
+    generateArts             Main                        test\Tests.hs:(62,1)-(65,27)                   854           0    0.0    0.0     1.5    2.9
+     withDeterministicRandom GeneratorUtils              test\GeneratorUtils.hs:(25,1)-(31,15)          855           0    0.0    0.0     1.5    2.9
+      setStdGen              System.Random               src\System\Random.hs:489:1-41                  861           2    0.0    0.0     0.0    0.0
+      getStdGen              System.Random               src\System\Random.hs:496:1-40                  856           1    0.0    0.0     0.0    0.0
+      generateArtifacts      Generator                   app\Generator.hs:76:1-70                       865           0    1.2    2.2     1.5    2.9
+       randomRIO             System.Random               src\System\Random.hs:550:1-46                  867      380197    0.0    0.1     0.2    0.7
+        getStdRandom         System.Random               src\System\Random.hs:(527,1)-(528,28)          868      380197    0.2    0.5     0.2    0.6
+         nextWord64          System.Random.SplitMix      src\System\Random\SplitMix.hs:(115,1)-(117,29) 869      380197    0.0    0.1     0.0    0.1
+       statRollToValue       ArtifactType                app\ArtifactType.hs:33:1-44                    896       80000    0.0    0.0     0.0    0.0
+       mainStatValue         ArtifactType                app\ArtifactType.hs:(38,1)-(42,29)             894           0    0.0    0.0     0.0    0.0
+        statRollToValue      ArtifactType                app\ArtifactType.hs:33:1-44                    895       20000    0.0    0.0     0.0    0.0
+      mkStdGen               System.Random.Internal      src\System\Random\Internal.hs:583:1-45         871           0    0.0    0.0     0.0    0.0
+       mkSMGen               System.Random.SplitMix      src\System\Random\SplitMix.hs:371:1-61         872           1    0.0    0.0     0.0    0.0
