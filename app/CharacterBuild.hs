@@ -340,9 +340,9 @@ bestBuildFolding n c setA offA = bb
     -- 2. The Loop
     go :: OptState -> [(Stat, Double)] -> Build
     go oldState oldWeights = 
-        if newMax > oldMax+00 -- Stop if improvement is negligible
+        if newMax > oldMax+0.001 -- Stop if improvement is negligible
         then go newState newWeights
-        else bestB newState
+        else bestB oldState
       where
         oldMax = maxD oldState
         
