@@ -34,22 +34,24 @@ printResult testName result = putStrLn output where
 
 main :: IO ()
 main = do
-  putStrLn "Running tests..."
-  results <- sequence testSuite
+  putStrLn "Running fast tests..."
+  results <- sequence regressionTests
   putStrLn$ "Tests run:"++show (length results)
-  putStrLn$ "Tests passed:"++show (length (filter (==True) results))
-  putStrLn "finished."
+  putStrLn$ "Tests passed:"++show (length (filter id results))
+  putStrLn "Tests finished."
+
+regressionTests :: [IO Bool]
+regressionTests = [
+    testMyFurina, testMyNefer,
+    testPartitionByPiece,
+    testProgressionProcessData,
+    testProgressionStatistics,
+    testPareto
+  ]
 
 testSuite :: [IO Bool]
 testSuite = [
-              --checkPartitionig,
-              --checkProcessData,
-              --checkStatistics,
-              --checkPareto,
-
               --testMinimisation
-              --testMyFurina, testMyNefer
-              --testUpgradeSimulator
               --foldingBestBuilds
               measureProgression
               --testWeightProgression
@@ -100,9 +102,9 @@ foldingBestBuilds = do
 
     return valid
 
--- In Tests.hs, add this function:
-testUpgradeSimulator :: IO Bool
-testUpgradeSimulator = go nefer 1000000 where
+--analyzes real build upgrade potential
+analyzeUpgradeFrequency  :: IO Bool
+analyzeUpgradeFrequency  = go nefer 1000000 where
   pairsToDays :: Int -> Double
   pairsToDays n = fromIntegral n*40/180 --180 resin per day, 40 resin per artifact pair
   printInfo :: Double -> (Piece, Int) -> IO ()
@@ -120,16 +122,16 @@ testUpgradeSimulator = go nefer 1000000 where
     mapM_ (printInfo interval) results
     return True
 
-checkPartitionig :: IO Bool
-checkPartitionig = do
+testPartitionByPiece :: IO Bool
+testPartitionByPiece = do
   let lst = [(Flower,1),(Flower,2),(Plume,7),(Plume,6),(Plume,4)]
   let res = partitionOnPiece fst lst
   let resp = map snd (res!Plume)
   --print resp
   return (resp == [7,6,4])
 
-checkProcessData :: IO Bool
-checkProcessData = do
+testProgressionProcessData :: IO Bool
+testProgressionProcessData = do
   let table = [
         (0,[(1, 10.0), (2, 20.0)]),
         (1,[(1, 15.0), (2, 25.0)])
@@ -139,8 +141,8 @@ checkProcessData = do
   --print actual
   return (actual == expected)
 
-checkStatistics :: IO Bool
-checkStatistics = do
+testProgressionStatistics :: IO Bool
+testProgressionStatistics = do
   let table = [
         [(1, [10.0]), (3, [20.0])],
         [(1, [15.0]), (2, [25.0])]
@@ -151,8 +153,8 @@ checkStatistics = do
   --print actual
   return (actual == expected)
 
-checkPareto :: IO Bool
-checkPareto = do
+testPareto :: IO Bool
+testPareto = do
   (setArts, offArts) <- generateArts 10
   let prfF = paretoFilter furina
   let prfR = paretoFilterReal furina
@@ -351,16 +353,16 @@ testMyFurina = do
     furinaA <- readGOOD "data/furina.json"
     let dmg = dmgClc furina [] furinaA
     print dmg
-    let result = abs (dmg - 28129)<1
+    let result = abs (dmg - 28129.65)<1
     printResult "My Furina Damage" result
     return result
 
 testMyNefer :: IO Bool
 testMyNefer = do
-    neferA <- readGOODForCharacter "data/Main_2026-02-03_11-27-42.json" "Nefer"
+    neferA <- readGOOD "data/nefer.json"
     let dmg = dmgClc nefer [] neferA
     print dmg
-    let result = abs (dmg - 28129)<1
+    let result = abs (dmg - 67601.86)<1
     printResult "My Nefer Damage" result
     return result
 
