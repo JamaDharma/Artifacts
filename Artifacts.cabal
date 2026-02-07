@@ -74,7 +74,7 @@ test-suite Artifacts-test
   import: warnings
   type: exitcode-stdio-1.0
   main-is: Tests.hs
-  other-modules: GeneratorUtils
+  other-modules: GeneratorUtils, BuildSearchComparision, TestData
   build-depends: base ^>=4.17.2.1, Artifacts, array, extra, hspec, random, time
   hs-source-dirs: test
   default-language: Haskell2010

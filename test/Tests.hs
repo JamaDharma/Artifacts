@@ -24,6 +24,7 @@ import Progression
 import Generator
 import ImportGOOD
 import GeneratorUtils
+import BuildSearchComparision
 import Text.Printf (printf)
 import System.IO (hFlush, stdout)
 import UpgradeSimulator
@@ -54,12 +55,15 @@ regressionTests = [
     testProgressionStatistics,
     testPareto
   ]
-
+heavyTests :: [IO Bool]
+heavyTests = [
+    measureAndRecordX --for data generation
+  ]
 testSuite :: [IO Bool]
 testSuite = [
               --testMinimisation
               --foldingBestBuilds
-              measureProgression
+              --measureProgression
               --measureAndRecordX
               --testWeightProgression
               --compareX
@@ -259,37 +263,6 @@ testMinimisation = do
 --(f'a+f''a*da)*wb/wa=(f'b+f''b*db)
 --db=((f'a+f''a*da)*wb/wa - f'b)/f''b
 --db=f'a/f''b*wb/wa+f''a/f''b*wb/wa*da - f'b/f''b
-
-getMeasure :: Int -> Int -> IO (Double, [(Int, Double)])
-getMeasure depth cases = do
-    let chr = furina
-    let damage = dmgClc chr []
-    let bm s o = [bestBuild depth chr s o]
-    let dfs = damageFromSeed damage 10000 bm
-    let getResults = go where
-        go [] = return []
-        go (seed:t) = do
-              putStr ("\r"++show seed++"      ")
-              hFlush stdout
-              dmg <- dfs seed
-              _ <- evaluate dmg  -- Explicitly force evaluation in IO
-              rest <- go t
-              if dmg /= 1 then return$ (seed,dmg):rest else return$ (seed,dmg):rest
-    whileMeasuringTime (getResults [0..cases])
-
-getReport :: [Char] -> Int -> Int -> IO [Char]
-getReport prefix depth cases = do
-  res <- getMeasure depth cases
-  let report = prefix ++"_"++show depth++"P_10K_"++show cases++"S = "++show res
-  return report
-
-measureAndRecordX :: IO Bool
-measureAndRecordX = do
-    let prefix = "bestBuild"
-    let reporter = uncurry (getReport prefix)
-    reports <- mapM reporter [(5,150),(10,50),(15,10)]
-    writeFile ("data/"++prefix++"Report.hs") (unlines reports)
-    return True
 
 demonstrateX :: IO Bool
 demonstrateX = do
