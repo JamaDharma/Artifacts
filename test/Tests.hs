@@ -1,5 +1,6 @@
 module Main where
 
+import Control.Exception (evaluate)
 import ArtifactType
 import Data.List (permutations,partition)
 import Data.List.Extra
@@ -39,6 +40,11 @@ main = do
   putStrLn$ "Tests run:"++show (length results)
   putStrLn$ "Tests passed:"++show (length (filter id results))
   putStrLn "Tests finished."
+  putStrLn "Running playground..."
+  results <- sequence testSuite
+  putStrLn$ "Playground run:"++show (length results)
+  putStrLn$ "Playground passed:"++show (length (filter id results))
+  putStrLn "Playground finished."
 
 regressionTests :: [IO Bool]
 regressionTests = [
@@ -54,8 +60,8 @@ testSuite = [
               --testMinimisation
               --foldingBestBuilds
               measureProgression
-              --testWeightProgression
               --measureAndRecordX
+              --testWeightProgression
               --compareX
               --demonstrateX
               --,testFurinaInForest
@@ -72,7 +78,7 @@ measureProgression :: IO Bool
 measureProgression = do
     (setArts, offArts) <- generateArts 1
     (t, prg) <- whileMeasuringTime $ do
-      let prg = progression furina (bestBuildFolding 7) setArts offArts
+      let prg = progression furina (bestBuild 7) setArts offArts
       --let prg = progression furina (bestBuild 7) setArts offArts
       putStrLn$ "AllBuilds: "++show (length prg)
       return prg
@@ -254,20 +260,19 @@ testMinimisation = do
 --db=((f'a+f''a*da)*wb/wa - f'b)/f''b
 --db=f'a/f''b*wb/wa+f''a/f''b*wb/wa*da - f'b/f''b
 
-
-
-
 getMeasure :: Int -> Int -> IO (Double, [(Int, Double)])
 getMeasure depth cases = do
-    let stW = zip (scaling furina) [1,1..]
-    let damage = dmgClc furina []
-    let bm = best4pcBuilds stW depth
+    let chr = furina
+    let damage = dmgClc chr []
+    let bm s o = [bestBuild depth chr s o]
     let dfs = damageFromSeed damage 10000 bm
     let getResults = go where
         go [] = return []
         go (seed:t) = do
               putStr ("\r"++show seed++"      ")
+              hFlush stdout
               dmg <- dfs seed
+              _ <- evaluate dmg  -- Explicitly force evaluation in IO
               rest <- go t
               if dmg /= 1 then return$ (seed,dmg):rest else return$ (seed,dmg):rest
     whileMeasuringTime (getResults [0..cases])
@@ -280,7 +285,7 @@ getReport prefix depth cases = do
 
 measureAndRecordX :: IO Bool
 measureAndRecordX = do
-    let prefix = "simple"
+    let prefix = "bestBuild"
     let reporter = uncurry (getReport prefix)
     reports <- mapM reporter [(5,150),(10,50),(15,10)]
     writeFile ("data/"++prefix++"Report.hs") (unlines reports)
