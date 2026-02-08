@@ -1,9 +1,10 @@
-module BuildSearchComparision where
+module BuildSearchComparision
+    (measureAndRecordX,testBuildMakerRegression) where
 
 import TestData
 import Control.Exception (evaluate)
 import ArtifactType ( Artifact, Build )
-import Data.List.Extra ( group, sort )
+import Data.List.Extra ( group, sort, groupSortOn )
 import Character ( Character(dmgClc), furina )
 import CharacterBuild
     ( bestBuild )
@@ -65,25 +66,32 @@ findMinDepth bf seed targetDamage maxDepth = do
 printRegressionTable :: String -> [(Int, Double)] -> IO ()
 printRegressionTable suiteName results = do
     putStrLn $ "\nSuite: " ++ suiteName
-    putStrLn "Depth | Count"
-    putStrLn "--------------"
-    let formatted = map formatResult results
-        grouped = group $ sort formatted
-        rows = map (\g -> (head g, length g)) grouped
-    mapM_ printRow rows
+    putStrLn "Depth | Count | Seeds"
+    putStrLn "----------------------"
+    let indexed = zip [0..] (map formatResult results) --potential bug: index may not
+        grouped = groupSortOn snd indexed
+        groupToRow g = (snd $ head g, length g, map fst g)
+    mapM_ (printRow . groupToRow) grouped
   where
     formatResult (depth, diff)
         | diff >= 0.1 = show depth ++ "*"
         | otherwise = show depth
-    printRow (depthStr, count) = 
-        putStrLn $ depthStr ++ replicate (6 - length depthStr) ' ' ++ "| " ++ show count
+    showPadded str = str ++ replicate (6 - length str) ' '
+    printRow (depthStr, count, seeds) =
+        putStrLn $ showPadded depthStr ++ "| " ++ showPadded (show count) ++ "| " ++ showSeeds seeds
+    showSeeds ss
+        | length ss <= 5 = show ss
+        | otherwise = show (take 3 ss) ++ "..." ++ show (reverse $ take 2 $ reverse ss)
 
 testBuildMakerRegression :: IO Bool
 testBuildMakerRegression = do
     let bf depth = bestBuild depth regTestChr
         maxDepth = 15
+        fmd (seed,target) = do
+            r <- findMinDepth bf seed target maxDepth
+            evaluate r
         runSuite name (_,refData) = do
-            results <- mapM (\(seed, target) -> findMinDepth bf seed target maxDepth) refData
+            results <- mapM fmd refData
             printRegressionTable name results
             return $ all (\(d, _) -> d /= -1) results
     pass1 <- runSuite "BestBuild 5P (150 cases)" bestBuild_5P_10K_150S
