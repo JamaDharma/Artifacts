@@ -34,18 +34,18 @@ printResult testName result = putStrLn output where
     output = "Test " ++ testName ++ ": " ++ showResult
     showResult = if result then "Passed" else "Failed"
 
+runSuit :: [Char] -> [IO Bool] -> IO ()
+runSuit name tests = do
+    putStrLn $ "Running " ++ name ++ "..."
+    results <- sequence tests
+    putStrLn $ name ++ " run: " ++ show (length results)
+    putStrLn $ name ++ " passed: " ++ show (length (filter id results))
+    putStrLn $ name ++ " finished."
 main :: IO ()
 main = do
-  putStrLn "Running fast tests..."
-  results <- sequence regressionTests
-  putStrLn$ "Tests run:"++show (length results)
-  putStrLn$ "Tests passed:"++show (length (filter id results))
-  putStrLn "Tests finished."
-  putStrLn "Running playground..."
-  results <- sequence testSuite
-  putStrLn$ "Playground run:"++show (length results)
-  putStrLn$ "Playground passed:"++show (length (filter id results))
-  putStrLn "Playground finished."
+  runSuit "Fast Tests" regressionTests
+  runSuit "Playground" playground
+  runSuit "Heavy Tests" heavyTests
 
 regressionTests :: [IO Bool]
 regressionTests = [
@@ -57,10 +57,11 @@ regressionTests = [
   ]
 heavyTests :: [IO Bool]
 heavyTests = [
-    measureAndRecordX --for data generation
+    --measureAndRecordX --for data generation
+    --testBuildMakerRegression
   ]
-testSuite :: [IO Bool]
-testSuite = [
+playground :: [IO Bool]
+playground = [
               --testMinimisation
               --foldingBestBuilds
               --measureProgression
