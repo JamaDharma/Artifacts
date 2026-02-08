@@ -29,38 +29,39 @@ import Text.Printf (printf)
 import System.IO (hFlush, stdout)
 import UpgradeSimulator
 
+type BuildFinder = Int -> [Artifact] -> [Artifact] -> Build
+
 regTestChr :: Character
 regTestChr = furina
 
-getMeasure :: Int -> Int -> IO (Double, [(Int, Double)])
-getMeasure depth cases = do
-    let chr = furina
-    let damage = dmgClc chr []
-    let bm s o = [bestBuild depth chr s o]
-    let dfs = damageFromSeed damage 10000 bm
+getMeasure :: BuildFinder -> Int -> Int -> IO (Double, [(Int, Double)])
+getMeasure bf depth cases = do
+    let damage = dmgClc regTestChr []
     let getResults = go where
         go [] = return []
-        go (seed:t) = do
-              putStr ("\r"++show seed++"      ")
-              hFlush stdout
-              dmg <- dfs seed
-              _ <- evaluate dmg  -- Explicitly force evaluation in IO
-              rest <- go t
-              if dmg /= 1 then return$ (seed,dmg):rest else return$ (seed,dmg):rest
-    whileMeasuringTime (getResults [0..cases])
+        go (seed:seeds) = do
+            putStr ("\r" ++ show seed ++ "      ")
+            hFlush stdout
+            (setA, offA) <- artifactsFromSeed seed
+            let build = bf depth setA offA
+                dmg = damage build
+            _ <- evaluate dmg
+            rest <- go seeds
+            return $ (seed, dmg) : rest
+    whileMeasuringTime (getResults [0..cases-1])
 
-getReport :: [Char] -> Int -> Int -> IO [Char]
-getReport prefix depth cases = do
-  res <- getMeasure depth cases
-  let report = prefix ++"_"++show depth++"P_10K_"++show cases++"S = "++show res
-  return report
+getReport :: String -> BuildFinder -> Int -> Int -> IO String
+getReport prefix bf depth cases = do
+    res <- getMeasure bf depth cases
+    let report = prefix ++ "_" ++ show depth ++ "P_10K_" ++ show cases ++ "S = " ++ show res
+    return report
 
 measureAndRecordX :: IO Bool
 measureAndRecordX = do
     let prefix = "bestBuild"
-    let reporter = uncurry (getReport prefix)
-    reports <- mapM reporter [(5,150),(10,50),(15,10)]
-    writeFile ("data/"++prefix++"Report.hs") (unlines reports)
+    let bf depth = bestBuild depth regTestChr
+    reports <- mapM (uncurry $ getReport prefix bf) [(5,150),(10,50),(15,10)]
+    writeFile ("data/" ++ prefix ++ "Report.hs") (unlines reports)
     return True
 
 -- | Find minimum depth where build maker achieves target damage for a seed
@@ -69,7 +70,7 @@ findMinDepth :: (Int->BuildMaker) -> Int -> Double -> Int -> IO (Int,[Char])
 findMinDepth bmm seed targetDamage maxDepth = tryDepth 1
   where
     damage = dmgClc regTestChr []
-    
+
     tryDepth depth
         | depth > maxDepth = return (-1,"")
         | otherwise = do

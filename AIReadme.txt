@@ -97,6 +97,7 @@ TEST MODULES (test/):
     - whileMeasuringTime: Benchmark wrapper
     - withDeterministicRandom: Reproducible tests
     - BuildMaker type aliases and comparison functions
+    - Caution: Changes to Generator.hs functions may invalidate recorded benchmarks
 
 14. TestData.hs - BENCHMARK RESULTS
     - Stored results from previous test runs

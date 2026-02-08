@@ -30,6 +30,15 @@ withDeterministicRandom seed action = do
   setStdGen oldGen
   return result
 
+--Generate artifacts based on a seed, number set at 10000 to ensure consistency
+artifactsFromSeed :: Int -> IO ([Artifact], [Artifact])
+artifactsFromSeed seed =
+    withDeterministicRandom seed $ do
+        setA <- generateArtifacts "GT" artN
+        offA <- generateArtifacts "MS" artN
+        return (setA, offA)
+    where artN = 10000
+
 buildMakerDiff::([Artifact]->Double)->Int->BuildMaker->BuildMaker->Int->IO Double
 buildMakerDiff dmgCalc artN buildMaker1 buildMaker2 seed =
     withDeterministicRandom seed $ do
@@ -43,7 +52,7 @@ buildMakerDiff dmgCalc artN buildMaker1 buildMaker2 seed =
         let r = res2 - res1 in if r == r then return r else return r
 
 damageFromSeed :: ([Artifact]->Double)->Int->BuildMaker->Int->IO Double
-damageFromSeed dmgCalc artN buildMaker seed =
+damageFromSeed dmgCalc artN buildMaker seed = 
     withDeterministicRandom seed $ do
         setA <- generateArtifacts "GT" artN
         offA <- generateArtifacts "MS" artN
