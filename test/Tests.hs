@@ -61,19 +61,19 @@ regressionTests = [
 heavyTests :: [IO Bool]
 heavyTests = [
     --measureAndRecordX --for data generation
-    testBuildMakerRegression
+    --testBuildMakerRegression
   ]
 playground :: [IO Bool]
 playground = [
               --testMinimisation
-              --foldingBestBuilds
+              --foldingBestBuilds,
               measureProgression
               --measureAndRecordX
               --testWeightProgression
               --testWeightComparison
               --compareX
               --demonstrateX
-              --,testFurinaInForest
+              --testFurinaInForest
             ]
 
 generateArts :: Int -> IO ([Artifact], [Artifact])
@@ -87,8 +87,8 @@ measureProgression :: IO Bool
 measureProgression = do
     (setArts, offArts) <- generateArts 1
     (t, prg) <- whileMeasuringTime $ do
-      let prg = progression furina (bestBuildFolding 7) setArts offArts
-      --let prg = progression furina (bestBuild 7) setArts offArts
+      --let prg = progression furina (bestBuildFolding 7) setArts offArts
+      let prg = progression furina (bestBuild 7) setArts offArts
       putStrLn$ "AllBuilds: "++show (length prg)
       return prg
     print.map fst $ prg

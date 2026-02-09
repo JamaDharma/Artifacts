@@ -51,4 +51,20 @@ appendStats = foldl' addStat
       CD  -> sl { slCD  = slCD sl + val }
       HB  -> sl { slHB  = slHB sl + val }
       DMG -> sl { slDMG = slDMG sl + val }
-      _   -> sl
+      HPf  -> error "Flat stats should not be used as buffs"
+      ATKf -> error "Flat stats should not be used as buffs"
+      DEFf -> error "Flat stats should not be used as buffs"
+      DMGb -> error "DMGb is not used"
+
+addStatlines :: Statline -> Statline -> Statline
+addStatlines sl1 sl2 = Statline
+  { slHP  = slHP sl1 + slHP sl2
+  , slATK = slATK sl1 + slATK sl2
+  , slDEF = slDEF sl1 + slDEF sl2
+  , slER  = slER sl1 + slER sl2
+  , slEM  = slEM sl1 + slEM sl2
+  , slCR  = slCR sl1 + slCR sl2
+  , slCD  = slCD sl1 + slCD sl2
+  , slHB  = slHB sl1 + slHB sl2
+  , slDMG = slDMG sl1 + slDMG sl2
+  }

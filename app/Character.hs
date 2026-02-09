@@ -23,8 +23,8 @@ data Character = Character
   , dmgClc   :: [(Stat,Double)]->Build->Double
   , stDmgClc :: Statline->Double
   }
---Statline for efficient access to agregate character stats
 
+--When collecting from Artifact
 collectStatsNormalized :: Character -> [(Stat, Double)] -> Statline
 collectStatsNormalized c statList = foldl' addStat zeroStatline normalized
   where

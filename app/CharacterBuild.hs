@@ -163,7 +163,8 @@ constraintRange minS maxS cv
 buildStatlines :: Character -> [Build] -> [Statline]
 buildStatlines c builds = map toStatline builds where
   charStats = collectStatsNormalized c (displS c ++ bonusS c)
-  toStatline b = appendStats charStats (concatMap stats b)
+  toStatline b = addStatlines charStats buildStats
+    where buildStats = collectStatsNormalized c (concatMap stats b)
 
 -- Apply single-stat buff to statline (buff in rolls, converted to value)
 buffStatline :: Statline -> Stat -> Double -> Statline

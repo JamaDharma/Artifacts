@@ -85,7 +85,7 @@ printRegressionTable suiteName results = do
 
 testBuildMakerRegression :: IO Bool
 testBuildMakerRegression = do
-    let bf depth = bestBuildFolding depth regTestChr
+    let bf depth = bestBuild depth regTestChr
         maxDepth = 15
         fmd (seed,target) = do
             (dp,df) <- findMinDepth bf seed target maxDepth
