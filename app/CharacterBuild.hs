@@ -88,7 +88,7 @@ foldRecursivelyS f sl acc (candidates:rest) currentStack =
   where
     processCandidate acc' candidate =
       -- Optimization: Accumulate stats incrementally
-      let newSL = appendStats sl (stats candidate) 
+      let newSL = appendStats sl (stats candidate) --bug: have to use collectStatsNormalized
       in foldRecursivelyS f newSL acc' rest (candidate:currentStack)
 
 -- 2. Generic traversal (Fixes the type error by supplying [])
