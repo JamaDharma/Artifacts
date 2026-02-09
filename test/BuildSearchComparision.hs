@@ -7,7 +7,7 @@ import ArtifactType ( Artifact, Build )
 import Data.List.Extra ( group, sort, groupSortOn )
 import Character ( Character(dmgClc), furina )
 import CharacterBuild
-    ( bestBuild )
+    ( bestBuild,bestBuildFolding )
 import GeneratorUtils ( artifactsFromSeed, whileMeasuringTime )
 import System.IO (hFlush, stdout)
 
@@ -85,11 +85,13 @@ printRegressionTable suiteName results = do
 
 testBuildMakerRegression :: IO Bool
 testBuildMakerRegression = do
-    let bf depth = bestBuild depth regTestChr
+    let bf depth = bestBuildFolding depth regTestChr
         maxDepth = 15
         fmd (seed,target) = do
-            r <- findMinDepth bf seed target maxDepth
-            evaluate r
+            (dp,df) <- findMinDepth bf seed target maxDepth
+            _ <- evaluate dp
+            _ <- evaluate df
+            return (dp, df)
         runSuite name (_,refData) = do
             results <- mapM fmd refData
             printRegressionTable name results

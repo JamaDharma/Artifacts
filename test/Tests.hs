@@ -5,7 +5,7 @@ import ArtifactType
 import Data.List (permutations,partition)
 import Data.List.Extra
 import Data.Array ((!), Array, listArray, array)
-import Character ( Character(name, dmgClc, scaling, stDmgClc), furina, nefer, statAccessor )
+import Character ( Character(name, dmgClc, scaling, stDmgClc), furina, nefer, collectStatsNormalized )
 import CharacterBuild
     ( BuildStrategy(BuildStrategy, weightCalculator, character,
                     buildMaker),
@@ -18,6 +18,7 @@ import CharacterBuild
       fold4pcBuilds,
       extendWeights,
       calcStatWeightsC,
+      calcStatWeightsB,
       bestBuildStrategic,
       updateWeights )
 import Progression
@@ -28,6 +29,7 @@ import BuildSearchComparision
 import Text.Printf (printf)
 import System.IO (hFlush, stdout)
 import UpgradeSimulator
+import StatlineType (Statline(slER))
 
 printResult :: String -> Bool -> IO()
 printResult testName result = putStrLn output where
@@ -41,6 +43,7 @@ runSuit name tests = do
     putStrLn $ name ++ " run: " ++ show (length results)
     putStrLn $ name ++ " passed: " ++ show (length (filter id results))
     putStrLn $ name ++ " finished."
+
 main :: IO ()
 main = do
   runSuit "Fast Tests" regressionTests
@@ -58,15 +61,16 @@ regressionTests = [
 heavyTests :: [IO Bool]
 heavyTests = [
     --measureAndRecordX --for data generation
-    --testBuildMakerRegression
+    testBuildMakerRegression
   ]
 playground :: [IO Bool]
 playground = [
               --testMinimisation
               --foldingBestBuilds
-              --measureProgression
+              measureProgression
               --measureAndRecordX
               --testWeightProgression
+              --testWeightComparison
               --compareX
               --demonstrateX
               --,testFurinaInForest
@@ -83,7 +87,7 @@ measureProgression :: IO Bool
 measureProgression = do
     (setArts, offArts) <- generateArts 1
     (t, prg) <- whileMeasuringTime $ do
-      let prg = progression furina (bestBuild 7) setArts offArts
+      let prg = progression furina (bestBuildFolding 7) setArts offArts
       --let prg = progression furina (bestBuild 7) setArts offArts
       putStrLn$ "AllBuilds: "++show (length prg)
       return prg
@@ -99,7 +103,7 @@ foldingBestBuilds = do
     setArts <- generateArtifacts "GT" 10000
     offArts <- generateArtifacts "MS" 10000
     let ttb = topBuilds furina 10
-    let ecsldc sl = if asr ER < 200 then 0 else stDmgClc furina asr where asr = statAccessor sl
+    let ecsldc sl = if slER sl < 200 then 0 else stDmgClc furina sl
     let rollW = extendWeights furina.zip (scaling furina)$[1,1..]
     let bldNrm = best4pcBuilds rollW 7 setArts offArts
     let acc (b,s) a = b:a
@@ -410,4 +414,23 @@ testWeightProgression = do
         newMax = maxDmg newBuilds
   let res = take 20$iterate go (0, rollW)
   putStrLn.unlines.map show$res
+  return True
+
+testWeightComparison :: IO Bool
+testWeightComparison = do
+  (setArts, offArts) <- generateArts 1
+  let rollW = zip (scaling furina) [1,1..]
+  let builds = best4pcBuilds (extendWeights furina rollW) 7 setArts offArts
+  
+  putStrLn $ "Number of builds: " ++ show (length builds)
+  putStrLn $ "Testing all builds:"
+  
+  let weights = calcStatWeightsB furina (builds) rollW
+  putStrLn "Weights calculated:"
+  mapM_ print weights
+  
+  -- Check if any weight is NaN or Infinity
+  let badWeights = filter (\(s,w) -> isNaN w || isInfinite w) weights
+  putStrLn $ "Bad weights: " ++ show badWeights
+  
   return True

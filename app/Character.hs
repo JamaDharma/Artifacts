@@ -1,16 +1,17 @@
 module Character(
   Character(..),
-  furina,
+  furina,nefer,
   getShownStat,
   getFinalStatline,
   getScalingStatline,
   conditionChecker,
-  Statline, statAccessor, statDecorator, collectStats, appendStats, nefer
+  collectStatsNormalized
 ) where
 
 import ArtifactType
+import StatlineType
 import Data.Array
-import qualified Data.Array.Unboxed as U
+import Data.List (foldl')
 
 data Character = Character
   { name     :: String
@@ -20,20 +21,36 @@ data Character = Character
   , bonusS   :: [(Stat, Double)]--values
   , condition:: [(Stat, Double)]--minimum values
   , dmgClc   :: [(Stat,Double)]->Build->Double
-  , stDmgClc :: (Stat->Double)->Double
+  , stDmgClc :: Statline->Double
   }
 --Statline for efficient access to agregate character stats
-type Statline = U.UArray Stat Double
-statAccessor :: Statline -> Stat -> Double
-statAccessor = (U.!)
-statDecorator :: Statline -> (Stat, Double) -> Stat -> Double
-statDecorator sl (bs,bv) s --accessor decorated with single buff
-  | s == bs = sl U.!s + bv
-  | otherwise = sl U.!s
-collectStats :: [(Stat, Double)] -> Statline
-collectStats = U.accumArray (+) 0.0 (HPf, DMGb)
-appendStats :: Statline -> [(Stat, Double)] -> Statline
-appendStats = U.accum (+)
+
+collectStatsNormalized :: Character -> [(Stat, Double)] -> Statline
+collectStatsNormalized c statList = foldl' addStat zeroStatline normalized
+  where
+    normalized = concatMap normalize statList
+    bs = baseS c
+    hasBase s = s `elem` scaling c
+    flatToP s v
+        | hasBase s = [(s, v / (bs ! s) * 100)]
+        | otherwise = []
+    normalize (s, v)
+      | s == HPf  = flatToP HP v
+      | s == ATKf = flatToP ATK v
+      | s == DEFf = flatToP DEF v
+      | s == DMGb = []  -- drop it
+      | otherwise = [(s, v)]
+    addStat sl (stat, val) = case stat of
+      HP  -> sl { slHP  = slHP sl + val }
+      ATK -> sl { slATK = slATK sl + val }
+      DEF -> sl { slDEF = slDEF sl + val }
+      ER  -> sl { slER  = slER sl + val }
+      EM  -> sl { slEM  = slEM sl + val }
+      CR  -> sl { slCR  = slCR sl + val }
+      CD  -> sl { slCD  = slCD sl + val }
+      HB  -> sl { slHB  = slHB sl + val }
+      DMG -> sl { slDMG = slDMG sl + val }
+      _   -> sl  -- HPf/ATKf/DEFf/DMGb ignored
 
 -- Combine stats into an Array Stat Double, summing values and using 0.0 as default
 combineStats :: [(Stat, Double)] -> Array Stat Double
@@ -55,14 +72,14 @@ getShownStat c arts s
   | otherwise = error ("Invalid stat" ++ show s)
   where statline = getShowStatline c arts
 
-critMult :: (Stat->Double) -> Double
+critMult :: Statline -> Double
 critMult sl = critMlt where
-  eCR = max 0 (min 100 (sl CR))/100
-  critMlt = 1 + eCR*sl CD/100
+  eCR = max 0 (min 100 (slCR sl))/100
+  critMlt = 1 + eCR*slCD sl/100
 
-simpleMult :: (Stat->Double) -> Double
+simpleMult :: Statline -> Double
 simpleMult sl = critMult sl*dmgMlt where
-  dmgMlt = 1 + sl DMG/100
+  dmgMlt = 1 + slDMG sl/100
 
 getScalingStatline :: Character->Artifact->Array Stat Double
 getScalingStatline c a = combineStats (map fIncS.scaling $ c) where
@@ -71,15 +88,14 @@ getScalingStatline c a = combineStats (map fIncS.scaling $ c) where
     | otherwise = (s,sl!s)
   sl = combineStats (stats a)
 
-conditionChecker :: Character -> (Stat -> Double) -> Bool
-conditionChecker c sla = all (\(cs,cv)->sla cs >= cv).condition$c
+conditionChecker :: Character -> Statline -> Bool
+conditionChecker c sl = all (\(cs,cv)->statAccessor sl cs >= cv).condition$c
 
 characterDamageCalculator :: Character->[(Stat,Double)]->(Build->Double)
 characterDamageCalculator c buff = buildDmg where
   sdc = stDmgClc c
-  buffStatline = combineStats (displS c ++ bonusS c ++ buff)
   buildDmg build = if conditionChecker c sla then sdc sla else 0
-    where sla = ((addStats buffStatline.concatMap stats$build)!)
+    where sla = collectStatsNormalized c (displS c ++ bonusS c ++ buff ++ concatMap stats build)
 
 furina :: Character
 furina = Character{
@@ -94,13 +110,13 @@ furina = Character{
    stDmgClc = furinaStatlineDmgClc furina
 }
 
-furinaStatlineDmgClc :: Character->((Stat->Double)->Double)
+furinaStatlineDmgClc :: Character->(Statline->Double)
 furinaStatlineDmgClc c = innerDmg where
   baseHP = baseS c!HP
   defMlt = 190/390
   baseMV = 14.92/100*1.4*0.9*defMlt
-  innerDmg sl = dmgOutput  where
-    effHp = sl HPf+baseHP*(1+sl HP/100)
+  innerDmg sl = dmgOutput where
+    effHp = baseHP*(1+slHP sl/100)  -- HPf already normalized into HP%
     dmgOutput = effHp*baseMV*simpleMult sl
 
 nefer :: Character
@@ -119,15 +135,15 @@ nefer = Character{
    stDmgClc = neferStatlineDmgClc nefer
 }
 
-neferStatlineDmgClc :: Character -> ((Stat->Double)->Double)
+neferStatlineDmgClc :: Character -> (Statline->Double)
 neferStatlineDmgClc _ = innerDmg where
-  talentMV = 1.728*(1+3*0.08) -- with bonus
-  lunarBloomDmgBonus = 0.746  -- 74.6% from team
-  lunarBloomBaseMult = 1+0.35   -- 35% from team
-  flatDmgIncrease = 5030.0    -- from Lauma (roughly constant, depends on Lauma stats)
+  talentMV = 1.728*(1+3*0.08)
+  lunarBloomDmgBonus = 0.746
+  lunarBloomBaseMult = 1+0.35
+  flatDmgIncrease = 5030.0
   
   innerDmg sl = finalDmg where
-    totalEM = sl EM
+    totalEM = slEM sl
     transformativeBonus = 6 * totalEM / (totalEM + 2000)
     reactionMult = 1 + transformativeBonus + lunarBloomDmgBonus
     

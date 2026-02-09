@@ -6,6 +6,7 @@ import Data.Ord (comparing, Down(..))
 import Data.Array
 import Data.List (maximumBy, minimumBy, foldl')
 import Data.List.Extra (sortOn, groupSortOn, maximumOn)
+import StatlineType
 
 type ArtifactStorage = ([Artifact], [Artifact])
 
@@ -61,14 +62,15 @@ extendWeights c = concatMap extend where
     | inRange (HP,DEF) s = [(s,w), pcntToFlatW (baseS c) (s,w)]
     | otherwise = [(s,w)]
 
-artValue :: (Stat->Double) -> Artifact -> Double
-artValue weights a = sum [value * weights stat | (stat, value) <- stats a]
+artValue :: [(Stat, Double)] -> Artifact -> Double
+artValue weights a = sum [value * w | (stat, value) <- stats a, (s, w) <- weights, s == stat]
 
 bestPieces :: [(Stat, Double)] -> Int -> [Artifact] -> [[Artifact]]
 bestPieces rollW n = map takeBestN.partition where
   partition = filter (/=[]).elems.partitionOnPiece piece
-  --statValueToRoll to convert from per roll to per value weights
-  sw = statAccessor.collectStats.map statValueToRoll $ rollW
+  -- TODO: rollW should be Weightline (Statline) for O(1) lookup when ArtifactInfo refactor lands
+  --statValueToRoll to convert from per roll to per value weights. We changing 1/roll to 1/value so usual conversion meaning inverted 
+  sw = map statValueToRoll rollW
   takeBestN = take n.sortOn (Data.Ord.Down. artValue sw)
 
 paretoFilter :: Character -> [Artifact] -> [Artifact]
@@ -95,7 +97,7 @@ foldOffpieceBuildsS extractor c callback initialAcc setA offA =
     foldl' processVariant initialAcc variants
   where
     -- Pre-calculate base stats once
-    baseSL = collectStats (displS c ++ bonusS c)
+    baseSL = collectStatsNormalized c (displS c ++ bonusS c)
     
     pieceT = piece.head
     setP = extractor setA
@@ -124,7 +126,8 @@ pieceNumMlt = array (Flower,Circlet)
   [(Flower,1.4),(Plume,1.4),(Sands,1),(Goblet,0.5),(Circlet,1)]
 pieceAwareExtractor :: [(Stat, Double)] -> Int -> [Artifact] -> [[Artifact]]
 pieceAwareExtractor rollW depth = map (takeBest.sortByVal).groupSortOn piece where
-  sw = statAccessor.collectStats.map statValueToRoll $ rollW --statValueToRoll to reverse
+  -- TODO: rollW should be Weightline (Statline) for O(1) lookup when ArtifactInfo refactor lands
+  sw = map statValueToRoll rollW
   sortByVal = sortOn (Data.Ord.Down. artValue sw)
   takeBest l = take n l where
     p = piece (head l)
@@ -156,66 +159,65 @@ constraintRange minS maxS cv
   | otherwise = (cv - range/2, cv + range/2)
   where range = (maxS - minS)/2
 
-constraintSlope :: Character->[Stat->Double]->(Stat,Double)->(Stat,Double)
-constraintSlope c statlines (cs,cv) = (cs, if dmg minRD == dmg maxRD then cv else  dDmg/dAvgRolls) where--error (show [(minR,maxR),(dmg minRD,dmg maxRD),(minRD cs,maxRD cs)]) where 
-  ext f = f (comparing ($ cs)) statlines
-  minS = ext minimumBy
-  maxS = ext maximumBy
-  (minR,maxR) = constraintRange (minS cs) (maxS cs) cv
+-- Build complete statlines from builds
+buildStatlines :: Character -> [Build] -> [Statline]
+buildStatlines c builds = map toStatline builds where
+  charStats = collectStatsNormalized c (displS c ++ bonusS c)
+  toStatline b = appendStats charStats (concatMap stats b)
 
-  --maximum on or by?
+-- Apply single-stat buff to statline (buff in rolls, converted to value)
+buffStatline :: Statline -> Stat -> Double -> Statline
+buffStatline sl s rolls = appendStats sl [statRollToValue (s, rolls)]
+
+-- Calculate sensitivity: damage change per roll of stat
+-- Uses ±17 rolls (≈2 good rolls) to measure slope
+calcSensitivity :: (Statline -> Double) -> [Statline] -> Stat -> Double
+calcSensitivity dmgCalc statlines s = (plusDmg - minusDmg) / baseDmg * 100 / 4 where
+  baseDmg = maximum (map dmgCalc statlines)
+  buffed rolls = map (\sl -> dmgCalc (buffStatline sl s rolls)) statlines
+  plusDmg = maximum (buffed 17)
+  minusDmg = maximum (buffed (-17))
+
+constraintSlope :: Character -> [Statline] -> (Stat,Double) -> (Stat,Double)
+constraintSlope c statlines (cs,cv) = (cs, if dmg minRD == dmg maxRD then cv else dDmg/dAvgRolls) where
+  -- Extract min/max value of stat cs across all builds
+  getStat sl = statAccessor sl cs
+  minS = minimumBy (comparing getStat) statlines
+  maxS = maximumBy (comparing getStat) statlines
+  (minR,maxR) = constraintRange (getStat minS) (getStat maxS) cv
+  
+  -- Find best build at each range boundary
   dmg = stDmgClc c
-  maxDamageR r = maximumBy (comparing dmg).filter ((>=r).($ cs)) $ statlines
+  maxDamageR r = maximumBy (comparing dmg) . filter ((>=r).getStat) $ statlines
   minRD = maxDamageR minR
   maxRD = maxDamageR maxR
-
-  (_, dRollValue) = statValueToRoll (cs, maxRD cs - minRD cs)
-  dAvgRolls = dRollValue/8.5 --8.5 is average roll value
+  
+  -- Calculate sensitivity
+  (_, dRollValue) = statValueToRoll (cs, getStat maxRD - getStat minRD)
+  dAvgRolls = dRollValue/8.5
   dDmg = (dmg minRD - dmg maxRD)/(dmg minRD + dmg maxRD)*2*100
 
---constraints weights updater
+-- Constraints weights updater - experimental
+-- Uses constraint-aware analysis when character has stat constraints (e.g., Furina HP threshold)
+-- Falls back to all builds if no valid builds exist, allowing weight estimation even with poor gear
 calcStatWeightsC :: Character->[Build]->[(Stat,Double)]->[(Stat,Double)]
 calcStatWeightsC c builds = map updateW where
-  calc = stDmgClc c
-  charStats = collectStats (displS c ++ bonusS c)
-  rawBuildsStats = map (statAccessor.appendStats charStats.concatMap stats) builds
-  buildsStats = if null fb then rawBuildsStats else fb where
-    fb = filter (conditionChecker c) rawBuildsStats
-  maxDmg buff = maximum.map bdc $ buildsStats where
-    nbs = map statRollToValue buff
-    bdc bs = calc accessor where accessor = buffDecorator bs nbs
-    buffDecorator sl [] s = sl s
-    buffDecorator sl [(bs,bv)] s
-      | s == bs = sl s + bv
-      | otherwise = sl s
-  bd = maxDmg []
-  --17*2 is 34 which is 4 avg rolls so 100/4 to get % per roll
-  --weight are relative, but useful to see when printed
-  newWeight s =  (maxDmg [(s,17)]-maxDmg [(s,-17)])/bd*100/4
-  updateW (s,_)
-    | null cnd = (s,newWeight s)
-    | otherwise = constraintSlope c rawBuildsStats (head cnd)
-    where
-      cnd = filter ((==s).fst) (condition c)
+  allStatlines = buildStatlines c builds
+  validStatlines = filter (conditionChecker c) allStatlines
+  -- Use valid builds if any, else all (enables weight calc even when no builds meet constraints)
+  statlines = if null validStatlines then allStatlines else validStatlines
+  dmgCalc = stDmgClc c
+  updateW (s, oldW)
+    | null cnd = (s, calcSensitivity dmgCalc statlines s)
+    | otherwise = constraintSlope c allStatlines (head cnd)
+    where cnd = filter ((==s).fst) (condition c)
 
---balansed weights updater
+-- Balanced weights updater - simple sensitivity analysis
 calcStatWeightsB :: Character->[Build]->[(Stat,Double)]->[(Stat,Double)]
 calcStatWeightsB c builds = map updateW where
-  calc sla = if conditionChecker c sla then stDmgClc c sla else 0
-  charStats = collectStats (displS c ++ bonusS c)
-  buildsStats = map (statAccessor.appendStats charStats.concatMap stats) builds
-  maxDmg buff = maximum.map bdc $ buildsStats where
-    nbs = map statRollToValue buff
-    bdc bs = calc accessor where accessor = buffDecorator bs nbs
-    buffDecorator sl [] s = sl s
-    buffDecorator sl [(bs,bv)] s
-      | s == bs = sl s + bv
-      | otherwise = sl s
-  bd = maxDmg []
-  --17*2 is 34 which is 4 avg rolls so 100/4 to get % per roll
-  --weight are relative, but useful to see when printed
-  newWeight s =  (maxDmg [(s,17)]-maxDmg [(s,-17)])/bd*100/4
-  updateW (s,_) =  (s,newWeight s)
+  dmgCalc sl = if conditionChecker c sl then stDmgClc c sl else 0
+  statlines = buildStatlines c builds
+  updateW (s, _) = (s, calcSensitivity dmgCalc statlines s)
 
 updateWeights2 :: Character -> Int -> [(Stat, Double)] -> [Artifact] -> [Artifact] -> (Double, [(Stat, Double)], [Build])
 updateWeights2 c n rollW setA offA  = go (maxDmg firstBuilds,rollW,firstBuilds) where
@@ -320,7 +322,7 @@ bestBuildFolding n c setA offA = bb
     optimizer (b, sl) (OptState bb md maxS minS) = 
         OptState newBB newMD newMaxS newMinS
       where
-        dmg = calc (statAccessor sl)
+        dmg = calc sl
         
         -- Update Best Build
         (newBB, newMD) = if dmg > md then (b, dmg) else (bb, md)
@@ -332,7 +334,7 @@ bestBuildFolding n c setA offA = bb
         updateSensMin (s, currentMax) = (s, max currentMax (calc (dec s (-17))))
         
         -- Decorator helper: temporarily add val to stat s
-        dec s val = statDecorator sl (statRollToValue (s, val))
+        dec s val = appendStats sl [statRollToValue (s, val)]
 
         newMaxS = map updateSens maxS
         newMinS = map updateSensMin minS
