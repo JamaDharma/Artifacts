@@ -67,7 +67,7 @@ playground :: [IO Bool]
 playground = [
               --testMinimisation
               --foldingBestBuilds,
-              measureProgression
+              --measureProgression
               --measureAndRecordX
               --testWeightProgression
               --testWeightComparison

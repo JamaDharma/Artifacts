@@ -7,7 +7,7 @@ import ArtifactType ( Artifact, Build )
 import Data.List.Extra ( group, sort, groupSortOn )
 import Character ( Character(dmgClc), furina )
 import CharacterBuild
-    ( bestBuild,bestBuildFolding )
+    ( bestBuild,bestBuildFolding, paretoFilterReal )
 import GeneratorUtils ( artifactsFromSeed, whileMeasuringTime )
 import System.IO (hFlush, stdout)
 
@@ -85,7 +85,9 @@ printRegressionTable suiteName results = do
 
 testBuildMakerRegression :: IO Bool
 testBuildMakerRegression = do
-    let bf depth = bestBuild depth regTestChr
+    let pf = paretoFilterReal regTestChr
+    --let bf depth = bestBuild depth regTestChr
+    let bf d set off = bestBuild d regTestChr (pf set) (pf off)
         maxDepth = 15
         fmd (seed,target) = do
             (dp,df) <- findMinDepth bf seed target maxDepth

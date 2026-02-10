@@ -79,3 +79,15 @@ test-suite Artifacts-test
   hs-source-dirs: test
   default-language: Haskell2010
   ghc-options:      -O2
+
+test-suite unit-tests
+  import: warnings
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  hs-source-dirs: test
+  -- The magic module that finds your specs automatically
+  other-modules: Unit.ParetoSpec
+  -- This is CRITICAL for the magic "Spec.hs" file to work
+  build-tool-depends: hspec-discover:hspec-discover
+  build-depends: base ^>=4.17.2.1, Artifacts, hspec, QuickCheck, array, extra, random
+  default-language: Haskell2010
