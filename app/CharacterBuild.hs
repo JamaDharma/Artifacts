@@ -33,7 +33,7 @@ paretoFilterBothInfo c = go [] []
 
     -- filtered: current pareto frontier (fully optimal)
     -- forward: artifacts that passed forward-only filter (input order)
-    go filtered forward [] = (reverse forward, filtered)
+    go filtered forward [] = (reverse forward, reverse filtered)
     go filtered forward (a:rest)
       | isDominated = go filtered forward rest
       | otherwise = go newFiltered (a:forward) rest
@@ -124,12 +124,25 @@ bestPieces rollW n = map takeBestN.partition where
   sw = map statValueToRoll rollW
   takeBestN = take n.sortOn (Data.Ord.Down. artValue sw)
 
+-- Forward-only filter: partition by piece, apply paretoBoth, extract forward-only
+paretoFilterInner :: Character -> [ArtifactInfo] -> [ArtifactInfo]
+paretoFilterInner c = concatMap filterPiece . groupSortOn aiPiece
+  where
+    filterPiece infos = fst (paretoFilterBothInfo c infos)
+
+-- Full pareto filter: partition by piece, apply paretoBoth, extract pareto frontier
+paretoFilterRealInner :: Character -> [ArtifactInfo] -> [ArtifactInfo]
+paretoFilterRealInner c = concatMap filterPiece . groupSortOn aiPiece
+  where
+    filterPiece infos = snd (paretoFilterBothInfo c infos)
+
 paretoFilter :: Character -> [Artifact] -> [Artifact]
-paretoFilter c = concatMap (paretoFront c).groupSortOn piece
+paretoFilter c arts = map aiOriginal (paretoFilterInner c infos)
+  where infos = map (toArtifactInfo c) arts
 
 paretoFilterReal :: Character -> [Artifact] -> [Artifact]
-paretoFilterReal c = concatMap (pf.reverse.pf).elems.partitionOnPieceR piece
-  where pf = paretoCandidatesOn c id
+paretoFilterReal c arts = map aiOriginal (paretoFilterRealInner c infos)
+  where infos = map (toArtifactInfo c) arts
 
 -- 1. Recursive helper that accumulates Statline
 foldRecursivelyS :: ((Build, Statline) -> a -> a) -> Statline -> a -> [[Artifact]] -> Build -> a
