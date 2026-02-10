@@ -23,7 +23,21 @@ data Character = Character
   , dmgClc   :: [(Stat,Double)]->Build->Double
   , stDmgClc :: Statline->Double
   }
+--structure for high performance core
+data ArtifactInfo = ArtifactInfo
+  { aiPiece :: !Piece
+  , aiMainStat :: !Stat  -- first element of stats
+  , aiStatline :: !Statline  -- normalized stats (artifact contribution only)
+  , aiOriginal :: Artifact  -- for export/display
+  } deriving (Show)
 
+toArtifactInfo :: Character -> Artifact -> ArtifactInfo
+toArtifactInfo c art = ArtifactInfo
+  { aiPiece = piece art
+  , aiMainStat = fst (head (stats art))
+  , aiStatline = collectStatsNormalized c (stats art)
+  , aiOriginal = art
+  }
 --When collecting from Artifact
 collectStatsNormalized :: Character -> [(Stat, Double)] -> Statline
 collectStatsNormalized c statList = foldl' addStat zeroStatline normalized
