@@ -1,11 +1,14 @@
 module Character(
   Character(..),
+  ArtifactInfo(..),
+  BuildInfo,
   furina,nefer,
   getShownStat,
   getFinalStatline,
   getScalingStatline,
   conditionChecker,
-  collectStatsNormalized
+  collectStatsNormalized,
+  toArtifactInfo
 ) where
 
 import ArtifactType
@@ -30,6 +33,8 @@ data ArtifactInfo = ArtifactInfo
   , aiStatline :: !Statline  -- normalized stats (artifact contribution only)
   , aiOriginal :: Artifact  -- for export/display
   } deriving (Show)
+
+type BuildInfo = [ArtifactInfo]
 
 toArtifactInfo :: Character -> Artifact -> ArtifactInfo
 toArtifactInfo c art = ArtifactInfo

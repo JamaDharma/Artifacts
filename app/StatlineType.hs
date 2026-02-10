@@ -16,6 +16,17 @@ data Statline = Statline
   , slDMG :: !Double
   } deriving (Show, Eq)
 
+type Weightline = Statline
+
+-- Core scoring operation: dot product of weights and stats
+-- Replaces artValue list iteration with O(1) field access
+{-# INLINE weightStatline #-}
+weightStatline :: Weightline -> Statline -> Double
+weightStatline wl sl = 
+  slHP wl * slHP sl + slATK wl * slATK sl + slDEF wl * slDEF sl +
+  slER wl * slER sl + slEM wl * slEM sl + slCR wl * slCR sl +
+  slCD wl * slCD sl + slHB wl * slHB sl + slDMG wl * slDMG sl
+
 {-# INLINE statAccessor #-}
 statAccessor :: Statline -> Stat -> Double
 statAccessor sl stat = case stat of

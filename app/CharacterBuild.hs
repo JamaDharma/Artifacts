@@ -62,6 +62,36 @@ extendWeights c = concatMap extend where
     | inRange (HP,DEF) s = [(s,w), pcntToFlatW (baseS c) (s,w)]
     | otherwise = [(s,w)]
 
+-- Convert roll weights to value Weightline (for core optimization)
+-- Core assumes stats are already normalized (no HPf/ATKf/DEFf)
+rollsToWeightline :: [(Stat, Double)] -> Weightline
+rollsToWeightline = foldl' addWeight zeroStatline
+  where
+    -- statValueToRoll on weights converts per-roll to per-value weights
+    -- We're changing 1/roll to 1/value, so usual conversion meaning is inverted
+    toValueW = statRollToValue
+
+    addWeight wl (stat, rollW) =
+      let (_, valueW) = toValueW (stat, rollW)
+      in case stat of
+        HP  -> wl { slHP  = slHP wl + valueW }
+        ATK -> wl { slATK = slATK wl + valueW }
+        DEF -> wl { slDEF = slDEF wl + valueW }
+        ER  -> wl { slER  = slER wl + valueW }
+        EM  -> wl { slEM  = slEM wl + valueW }
+        CR  -> wl { slCR  = slCR wl + valueW }
+        CD  -> wl { slCD  = slCD wl + valueW }
+        HB  -> wl { slHB  = slHB wl + valueW }
+        DMG -> wl { slDMG = slDMG wl + valueW }
+        HPf  -> error "Flat stats should not appear in core weights"
+        ATKf -> error "Flat stats should not appear in core weights"
+        DEFf -> error "Flat stats should not appear in core weights"
+        DMGb -> error "DMGb not used in weights"
+
+-- Default starting weights (1.0 per roll for each scaling stat)
+defaultWeightline :: Character -> Weightline
+defaultWeightline c = rollsToWeightline (zip (scaling c) (repeat 1.0))
+
 artValue :: [(Stat, Double)] -> Artifact -> Double
 artValue weights a = sum [value * w | (stat, value) <- stats a, (s, w) <- weights, s == stat]
 
@@ -98,11 +128,11 @@ foldOffpieceBuildsS extractor c callback initialAcc setA offA =
   where
     -- Pre-calculate base stats once
     baseSL = collectStatsNormalized c (displS c ++ bonusS c)
-    
+
     pieceT = piece.head
     setP = extractor setA
     offP = extractor offA
-    
+
     -- Logic to create variant layers
     off p = filter ((/=p).pieceT) setP ++ filter ((==p).pieceT) offP
     variants = setP : map (sortOn pieceT . off . pieceT) offP
@@ -112,7 +142,7 @@ foldOffpieceBuildsS extractor c callback initialAcc setA offA =
 
 -- 3. The main function
 fold4pcBuilds :: Character -> ((Build,Statline) -> a -> a) -> a -> [(Stat,Double)] -> Int -> [Artifact] -> [Artifact] -> a
-fold4pcBuilds c callback initialAcc rollW n = 
+fold4pcBuilds c callback initialAcc rollW n =
     foldOffpieceBuildsS (bestPieces rollW n) c callback initialAcc
 
 best4pcBuilds :: [(Stat,Double)]->Int->[Artifact]->[Artifact]->[Build]
@@ -186,13 +216,13 @@ constraintSlope c statlines (cs,cv) = (cs, if dmg minRD == dmg maxRD then cv els
   minS = minimumBy (comparing getStat) statlines
   maxS = maximumBy (comparing getStat) statlines
   (minR,maxR) = constraintRange (getStat minS) (getStat maxS) cv
-  
+
   -- Find best build at each range boundary
   dmg = stDmgClc c
   maxDamageR r = maximumBy (comparing dmg) . filter ((>=r).getStat) $ statlines
   minRD = maxDamageR minR
   maxRD = maxDamageR maxR
-  
+
   -- Calculate sensitivity
   (_, dRollValue) = statValueToRoll (cs, getStat maxRD - getStat minRD)
   dAvgRolls = dRollValue/8.5
@@ -298,7 +328,7 @@ bestBuild n c setA offA  =  bb where
       newMax = maxBy dmg newBuilds
 
 -- The state we carry through the fold
-data OptState = OptState 
+data OptState = OptState
   { bestB :: !Build           -- The absolute best build so far
   , maxD  :: !Double          -- Damage of bestB
   , maxSens :: ![(Stat, Double)] -- Max damage found for (+Stat) scenarios
@@ -316,24 +346,24 @@ bestBuildFolding n c setA offA = bb
     -- 1. Setup constants and helpers
     calc sla = if conditionChecker c sla then stDmgClc c sla else 0
     scaleStats = scaling c
-    
+
     -- This is the callback run at every single leaf (Build)
     -- It updates the Global Max and the Sensitivity Maxes
     optimizer :: (Build, Statline) -> OptState -> OptState
-    optimizer (b, sl) (OptState bb md maxS minS) = 
+    optimizer (b, sl) (OptState bb md maxS minS) =
         OptState newBB newMD newMaxS newMinS
       where
         dmg = calc sl
-        
+
         -- Update Best Build
         (newBB, newMD) = if dmg > md then (b, dmg) else (bb, md)
-        
+
         -- Check Sensitivity: 
         -- What if this build had +17 (approx 2 rolls) of Stat X?
         -- We track the theoretical MAX damage available for that scenario.
         updateSens (s, currentMax) = (s, max currentMax (calc (dec s 17)))
         updateSensMin (s, currentMax) = (s, max currentMax (calc (dec s (-17))))
-        
+
         -- Decorator helper: temporarily add val to stat s
         dec s val = appendStats sl [statRollToValue (s, val)]
 
@@ -342,21 +372,21 @@ bestBuildFolding n c setA offA = bb
 
     -- 2. The Loop
     go :: OptState -> [(Stat, Double)] -> Build
-    go oldState oldWeights = 
+    go oldState oldWeights =
         if newMax > oldMax+0.001 -- Stop if improvement is negligible
         then go newState newWeights
         else bestB oldState
       where
         oldMax = maxD oldState
-        
+
         -- RUN THE FOLD (The heavy lifting happens here)
         newState = fold4pcBuilds c optimizer (initialOptState c) (extendWeights c oldWeights) n setA offA
         newMax = maxD newState
-        
+
         -- Calculate new weights based on the data we just collected
         -- Formula: (MaxWithPlus - MaxWithMinus) / BaseMax
         newWeights = zipWith calcW (maxSens newState) (minSens newState)
-        calcW (s, plusDmg) (_, minusDmg) = 
+        calcW (s, plusDmg) (_, minusDmg) =
              (s, (plusDmg - minusDmg) / newMax * 25) -- *25 is arbitrary scaling factor
 
     -- 3. Kickoff
