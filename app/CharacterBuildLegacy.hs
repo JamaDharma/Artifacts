@@ -1,7 +1,7 @@
 module CharacterBuildLegacy (bestBuildLegacy) where
 
 import ArtifactType
-import Character
+import Character(Character(..))
 import Data.Ord (comparing, Down(..))
 import Data.Array
 import Data.List (maximumBy)
@@ -21,10 +21,40 @@ collectStats = accumArray (+) 0.0 (HPf, DMGb)
 appendStats :: Statline -> [(Stat, Double)] -> Statline
 appendStats = accum (+)
 
+-- Combine stats into an Array Stat Double, summing values and using 0.0 as default
+combineStats :: [(Stat, Double)] -> Array Stat Double
+combineStats = accumArray (+) 0.0 (HPf, DMGb)
+addStats :: Array Stat Double -> [(Stat, Double)] -> Array Stat Double
+addStats = accum (+)
+
+conditionChecker :: Character -> (Stat -> Double) -> Bool
+conditionChecker c sla = all (\(cs,cv)->sla cs >= cv).condition$c
+stDmgClc2 :: Character -> (Stat -> Double) -> Double
+stDmgClc2 c sla = furinaStatlineDmgClc c sla
+furinaStatlineDmgClc :: Character->((Stat->Double)->Double)
+furinaStatlineDmgClc c = innerDmg where
+  baseHP = baseS c!HP
+  defMlt = 190/390
+  baseMV = 14.92/100*1.4*0.9*defMlt
+  innerDmg sl = dmgOutput  where
+    effHp = sl HPf+baseHP*(1+sl HP/100)
+    dmgOutput = effHp*baseMV*simpleMult sl
+simpleMult :: (Stat->Double) -> Double
+simpleMult sl = critMlt*dmgMlt where
+  eCR = max 0 (min 100 (sl CR))/100
+  critMlt = 1 + eCR*sl CD/100
+  dmgMlt = 1 + sl DMG/100
+characterDamageCalculator :: Character->[(Stat,Double)]->(Build->Double)
+characterDamageCalculator c buff = buildDmg where
+  sdc = stDmgClc2 c
+  buffStatline = combineStats (displS c ++ bonusS c ++ buff)
+  buildDmg build = if conditionChecker c sla then sdc sla else 0
+    where sla = ((addStats buffStatline.concatMap stats$build)!)
+
 -- Main Entry Point
 bestBuildLegacy :: Int -> Character -> [Artifact] -> [Artifact] -> Build
 bestBuildLegacy n c setA offA = bb where
-  dmg = dmgClc c []
+  dmg = characterDamageCalculator c []
   -- Helper to make builds based on weights
   bmkr w = best4pcBuilds (extendWeights c w) n setA offA
   maxBy = maximumBy . comparing
@@ -50,7 +80,7 @@ bestBuildLegacy n c setA offA = bb where
 calcStatWeightsB :: Character -> [Build] -> [(Stat,Double)] -> [(Stat,Double)]
 calcStatWeightsB c builds = map updateW where
   -- Use stDmgClc for internal weight calculation
-  calc sla = if conditionChecker c sla then stDmgClc c sla else 0
+  calc sla = if conditionChecker c sla then stDmgClc2 c sla else 0
   
   charStats = collectStats (displS c ++ bonusS c)
   buildsStats = map (statAccessor . appendStats charStats . concatMap stats) builds
@@ -64,7 +94,6 @@ calcStatWeightsB c builds = map updateW where
       | otherwise = sl s
       
   bd = maxDmg []
-  
   -- Calculate gradient: (Dmg(+roll) - Dmg(-roll)) / BaseDmg
   -- 17*2 is 34 which is ~4 avg rolls, so we scale to 100/4 to get % per roll
   newWeight s = (maxDmg [(s,17)] - maxDmg [(s,-17)]) / bd * 100 / 4
