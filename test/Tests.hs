@@ -20,7 +20,8 @@ import CharacterBuild
       calcStatWeightsC,
       calcStatWeightsB,
       bestBuildStrategic,
-      updateWeights )
+      updateWeights, bestBuildFoldingNew )
+import CharacterBuildLegacy (bestBuildLegacy)
 import Progression
 import Generator
 import ImportGOOD
@@ -67,7 +68,7 @@ playground :: [IO Bool]
 playground = [
               --testMinimisation
               --foldingBestBuilds,
-              --measureProgression
+              measureProgression
               --measureAndRecordX
               --testWeightProgression
               --testWeightComparison
@@ -88,7 +89,7 @@ measureProgression = do
     (setArts, offArts) <- generateArts 1
     (t, prg) <- whileMeasuringTime $ do
       --let prg = progression furina (bestBuildFolding 7) setArts offArts
-      let prg = progression furina (bestBuild 7) setArts offArts
+      let prg = progression furina (bestBuildLegacy 7) setArts offArts
       putStrLn$ "AllBuilds: "++show (length prg)
       return prg
     print.map fst $ prg
