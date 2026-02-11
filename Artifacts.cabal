@@ -56,7 +56,7 @@ common warnings
 
 library
   import: warnings
-  exposed-modules: StatlineType, ArtifactType, Character, UpgradeSimulator, CharacterBuild, CharacterBuildInfo, Weights, Progression, Generator, RollProbability, ImportGOOD, ExportPlot
+  exposed-modules: StatlineType, ArtifactType, Character, UpgradeSimulator, CharacterBuild, CharacterBuildInfo, Weights, Progression, Generator, RollProbability, ImportGOOD, ExportPlot, CharacterBuildLegacy
   hs-source-dirs: app
   build-depends: base ^>=4.17.2.1, random, array, containers, extra, bytestring, aeson, async-extra
   default-language: Haskell2010
@@ -64,7 +64,7 @@ library
 executable Artifacts
   import: warnings
   main-is: Main.hs
-  other-modules: StatlineType, ArtifactType, Character, UpgradeSimulator, CharacterBuild, CharacterBuildInfo, Weights, Progression, Generator, RollProbability, ImportGOOD, ExportPlot
+  other-modules: StatlineType, ArtifactType, Character, UpgradeSimulator, CharacterBuild, CharacterBuildInfo, Weights, Progression, Generator, RollProbability, ImportGOOD, ExportPlot, CharacterBuildLegacy
   build-depends: base ^>=4.17.2.1, Artifacts, random, array, containers, extra, bytestring, aeson, time, async-extra
   hs-source-dirs: app
   default-language: Haskell2010
