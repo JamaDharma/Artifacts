@@ -17,7 +17,7 @@ Depth | Count | Seeds
 4     | 39    | [5,6,7]...[145,149]
 4*    | 2     | [41,59]
 5     | 35    | [1,12,14]...[131,143]
-
+Processed seed: 49 Depth: 4    
 Suite: BestBuild 10P (50 cases)
 Depth | Count | Seeds
 ----------------------
@@ -29,7 +29,7 @@ Depth | Count | Seeds
 6     | 3     | [13,19,45]
 7     | 3     | [23,43,44]
 9     | 1     | [18]
-
+Processed seed: 9 Depth: 3    
 Suite: BestBuild 15P (10 cases)
 Depth | Count | Seeds
 ----------------------
