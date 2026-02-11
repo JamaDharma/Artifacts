@@ -82,12 +82,17 @@ printRegressionTable suiteName results = do
     showSeeds ss
         | length ss <= 5 = show ss
         | otherwise = show (take 3 ss) ++ "..." ++ show (reverse $ take 2 $ reverse ss)
-
+-- A strict version of foldM for IO
+foldlM' :: (Monad m) => (a -> b -> m a) -> a -> [b] -> m a
+foldlM' _ z [] = return z
+foldlM' f z (x:xs) = do
+  z' <- f z x
+  z' `seq` foldlM' f z' xs
 testBuildMakerRegression :: IO Bool
 testBuildMakerRegression = do
     let pf = paretoFilterReal regTestChr
-    --let bf depth = bestBuild depth regTestChr
-    let bf d set off = bestBuild d regTestChr (pf set) (pf off)
+    let bf depth = bestBuild depth regTestChr
+    --let bf d set off = bestBuild d regTestChr (pf set) (pf off)
         maxDepth = 15
         fmd (seed,target) = do
             (dp,df) <- findMinDepth bf seed target maxDepth
@@ -95,7 +100,16 @@ testBuildMakerRegression = do
             _ <- evaluate df
             return (dp, df)
         runSuite name (_,refData) = do
-            results <- mapM fmd refData
+            results<- foldlM' (\acc entry -> do
+                res <- fmd entry
+                -- Display current progress
+                putStr ("\rProcessing seed: " ++ show (fst entry) ++ " Depth: " ++ show (fst res) ++ "    ")
+                --putStrLn ("Processing seed: " ++ show (fst entry) ++ " Depth: " ++ show (fst res) ++ "    ")
+                hFlush stdout
+                -- Force the tuple AND its contents (Int, Double) into memory
+                _ <- evaluate res
+                return $ res : acc
+                ) [] refData
             printRegressionTable name results
             return $ all (\(d, _) -> d /= -1) results
     pass1 <- runSuite "BestBuild 5P (150 cases)" bestBuild_5P_10K_150S
