@@ -18,7 +18,7 @@ rollsToWeightline = foldl' addWeight zeroStatline
   where
     -- statValueToRoll on weights converts per-roll to per-value weights
     -- We're changing 1/roll to 1/value, so usual conversion meaning is inverted
-    toValueW = statRollToValue
+    toValueW = statValueToRoll
 
     addWeight wl (stat, rollW) =
       let (_, valueW) = toValueW (stat, rollW)
