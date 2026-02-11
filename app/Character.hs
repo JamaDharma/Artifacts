@@ -92,9 +92,9 @@ getShownStat c arts s
   where statline = getShowStatline c arts
 
 critMult :: Statline -> Double
-critMult sl = critMlt where
-  eCR = max 0 (min 100 (slCR sl))/100
-  critMlt = 1 + eCR*slCD sl/100
+critMult sl = 1 + clampedCR * slCD sl * 0.0001  -- 0.0001 = 1/(100*100)
+  where clampedCR = max 0 (min 100 (slCR sl))
+{-# INLINE critMult #-}
 
 simpleMult :: Statline -> Double
 simpleMult sl = critMult sl*dmgMlt where
@@ -163,10 +163,12 @@ neferStatlineDmgClc _ = innerDmg where
   
   innerDmg sl = finalDmg where
     totalEM = slEM sl
-    transformativeBonus = 6 * totalEM / (totalEM + 2000)
+    emFactor = totalEM / (totalEM + 2000)  -- One division
+    transformativeBonus = 6 * emFactor
     reactionMult = 1 + transformativeBonus + lunarBloomDmgBonus
     
-    scalingDmg = talentMV*totalEM*reactionMult*lunarBloomBaseMult
+    scalingDmg = talentMV * totalEM * reactionMult * lunarBloomBaseMult
     dmgBeforeCrit = scalingDmg + flatDmgIncrease
     
     finalDmg = dmgBeforeCrit * critMult sl
+  {-# INLINE innerDmg #-}  -- Or INLINE neferStatlineDmgClc
