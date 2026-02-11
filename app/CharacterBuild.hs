@@ -2,6 +2,7 @@ module CharacterBuild where
 
 import ArtifactType
 import Character
+import CharacterBuildInfo (paretoFilterInfo, paretoFilterRealInfo, bestBuildInfo, bestBuildFoldingInfo)
 import Data.Ord (comparing, Down(..))
 import Data.Array
 import Data.List (maximumBy, minimumBy, foldl')
@@ -22,27 +23,6 @@ defaultStrategy c n = BuildStrategy {
     buildMaker = \(s,o) w -> best4pcBuilds (extendWeights c w) n s o,
     weightCalculator = calcStatWeightsB c
   }
--- Pareto filtering using ArtifactInfo (direct Statline comparison, no Array allocation)
--- Returns: (forward-only filtered, full pareto frontier)
--- forward-only: preserves input order, artifacts not dominated when first seen
--- full pareto: maintains pareto optimality, order undefined
-paretoFilterBothInfo :: Character -> [ArtifactInfo] -> ([ArtifactInfo], [ArtifactInfo])
-paretoFilterBothInfo c = go [] []
-  where
-    scl = scaling c
-
-    -- filtered: current pareto frontier (fully optimal)
-    -- forward: artifacts that passed forward-only filter (input order)
-    go filtered forward [] = (reverse forward, reverse filtered)
-    go filtered forward (a:rest)
-      | isDominated = go filtered forward rest
-      | otherwise = go newFiltered (a:forward) rest
-      where
-        slA = aiStatline a
-        isDominated = any (\f -> dominates (aiStatline f) slA) filtered
-        newFiltered = a : filter (not . dominates slA . aiStatline) filtered
-        -- f dominates a if f >= a on all scaling stats
-        dominates slF slA' = all (\s -> statAccessor slF s >= statAccessor slA' s) scl
 
 --reverses order of elements while partitioning
 partitionOnPieceR :: (a -> Piece) -> [a] -> Array Piece [a]
@@ -83,67 +63,27 @@ extendWeights c = concatMap extend where
     | inRange (HP,DEF) s = [(s,w), pcntToFlatW (baseS c) (s,w)]
     | otherwise = [(s,w)]
 
--- Convert roll weights to value Weightline (for core optimization)
--- Core assumes stats are already normalized (no HPf/ATKf/DEFf)
-rollsToWeightline :: [(Stat, Double)] -> Weightline
-rollsToWeightline = foldl' addWeight zeroStatline
-  where
-    -- statValueToRoll on weights converts per-roll to per-value weights
-    -- We're changing 1/roll to 1/value, so usual conversion meaning is inverted
-    toValueW = statRollToValue
-
-    addWeight wl (stat, rollW) =
-      let (_, valueW) = toValueW (stat, rollW)
-      in case stat of
-        HP  -> wl { slHP  = slHP wl + valueW }
-        ATK -> wl { slATK = slATK wl + valueW }
-        DEF -> wl { slDEF = slDEF wl + valueW }
-        ER  -> wl { slER  = slER wl + valueW }
-        EM  -> wl { slEM  = slEM wl + valueW }
-        CR  -> wl { slCR  = slCR wl + valueW }
-        CD  -> wl { slCD  = slCD wl + valueW }
-        HB  -> wl { slHB  = slHB wl + valueW }
-        DMG -> wl { slDMG = slDMG wl + valueW }
-        HPf  -> error "Flat stats should not appear in core weights"
-        ATKf -> error "Flat stats should not appear in core weights"
-        DEFf -> error "Flat stats should not appear in core weights"
-        DMGb -> error "DMGb not used in weights"
-
--- Default starting weights (1.0 per roll for each scaling stat)
-defaultWeightline :: Character -> Weightline
-defaultWeightline c = rollsToWeightline (zip (scaling c) (repeat 1.0))
-
+-- Deprecated: O(n²) scoring for backward compatibility
 artValue :: [(Stat, Double)] -> Artifact -> Double
 artValue weights a = sum [value * w | (stat, value) <- stats a, (s, w) <- weights, s == stat]
 
 bestPieces :: [(Stat, Double)] -> Int -> [Artifact] -> [[Artifact]]
 bestPieces rollW n = map takeBestN.partition where
   partition = filter (/=[]).elems.partitionOnPiece piece
-  -- TODO: rollW should be Weightline (Statline) for O(1) lookup when ArtifactInfo refactor lands
   --statValueToRoll to convert from per roll to per value weights. We changing 1/roll to 1/value so usual conversion meaning inverted 
   sw = map statValueToRoll rollW
   takeBestN = take n.sortOn (Data.Ord.Down. artValue sw)
 
--- Forward-only filter: partition by piece, apply paretoBoth, extract forward-only
-paretoFilterInner :: Character -> [ArtifactInfo] -> [ArtifactInfo]
-paretoFilterInner c = concatMap filterPiece . groupSortOn aiPiece
-  where
-    filterPiece infos = fst (paretoFilterBothInfo c infos)
-
--- Full pareto filter: partition by piece, apply paretoBoth, extract pareto frontier
-paretoFilterRealInner :: Character -> [ArtifactInfo] -> [ArtifactInfo]
-paretoFilterRealInner c = concatMap filterPiece . groupSortOn aiPiece
-  where
-    filterPiece infos = snd (paretoFilterBothInfo c infos)
-
+-- PARETO FILTERING WRAPPERS (delegate to CharacterBuildInfo)
 paretoFilter :: Character -> [Artifact] -> [Artifact]
-paretoFilter c arts = map aiOriginal (paretoFilterInner c infos)
+paretoFilter c arts = map aiOriginal (paretoFilterInfo c infos)
   where infos = map (toArtifactInfo c) arts
 
 paretoFilterReal :: Character -> [Artifact] -> [Artifact]
-paretoFilterReal c arts = map aiOriginal (paretoFilterRealInner c infos)
+paretoFilterReal c arts = map aiOriginal (paretoFilterRealInfo c infos)
   where infos = map (toArtifactInfo c) arts
 
+-- OLD FOLD INFRASTRUCTURE (has bugs - use CharacterBuildInfo instead)
 -- 1. Recursive helper that accumulates Statline
 foldRecursivelyS :: ((Build, Statline) -> a -> a) -> Statline -> a -> [[Artifact]] -> Build -> a
 foldRecursivelyS f sl acc [] currentStack = f (currentStack, sl) acc
@@ -162,15 +102,12 @@ foldOffpieceBuildsS extractor c callback initialAcc setA offA =
   where
     -- Pre-calculate base stats once
     baseSL = collectStatsNormalized c (displS c ++ bonusS c)
-
     pieceT = piece.head
     setP = extractor setA
     offP = extractor offA
-
     -- Logic to create variant layers
     off p = filter ((/=p).pieceT) setP ++ filter ((==p).pieceT) offP
     variants = setP : map (sortOn pieceT . off . pieceT) offP
-
     -- FIX: This helper supplies the empty Build [] to start recursion for each variant
     processVariant acc layers = foldRecursivelyS callback baseSL acc layers []
 
@@ -188,9 +125,9 @@ bestBuilds rollW n = sequence.bestPieces rollW n
 pieceNumMlt :: Array Piece Double
 pieceNumMlt = array (Flower,Circlet)
   [(Flower,1.4),(Plume,1.4),(Sands,1),(Goblet,0.5),(Circlet,1)]
+
 pieceAwareExtractor :: [(Stat, Double)] -> Int -> [Artifact] -> [[Artifact]]
 pieceAwareExtractor rollW depth = map (takeBest.sortByVal).groupSortOn piece where
-  -- TODO: rollW should be Weightline (Statline) for O(1) lookup when ArtifactInfo refactor lands
   sw = map statValueToRoll rollW
   sortByVal = sortOn (Data.Ord.Down. artValue sw)
   takeBest l = take n l where
@@ -426,3 +363,18 @@ bestBuildFolding n c setA offA = bb
     -- 3. Kickoff
     startWeights = zip scaleStats [1,1..]
     bb = go (initialOptState c) startWeights
+-- NEW API WRAPPERS (delegate to CharacterBuildInfo)
+-- These use the bug-fixed, optimized ArtifactInfo-based implementation
+bestBuildNew :: Int -> Character -> [Artifact] -> [Artifact] -> Build
+bestBuildNew n c setA offA = map aiOriginal buildInfo
+  where
+    setInfos = map (toArtifactInfo c) setA
+    offInfos = map (toArtifactInfo c) offA
+    buildInfo = bestBuildInfo n c setInfos offInfos
+
+bestBuildFoldingNew :: Int -> Character -> [Artifact] -> [Artifact] -> Build
+bestBuildFoldingNew n c setA offA = map aiOriginal buildInfo
+  where
+    setInfos = map (toArtifactInfo c) setA
+    offInfos = map (toArtifactInfo c) offA
+    buildInfo = bestBuildFoldingInfo n c setInfos offInfos
