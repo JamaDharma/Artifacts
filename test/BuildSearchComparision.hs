@@ -63,19 +63,19 @@ findMinDepth bf seed targetDamage maxDepth = do
             diff = damage (bf depth setA offA) - targetDamage
     return $ tryDepth 1
 
-printRegressionTable :: String -> [(Int, Double)] -> IO ()
+printRegressionTable :: String -> [(Int, Int, Double)] -> IO ()
 printRegressionTable suiteName results = do
     putStrLn $ "\nSuite: " ++ suiteName
     putStrLn "Depth | Count | Seeds"
     putStrLn "----------------------"
-    let indexed = zip [0..] (map formatResult results) --potential bug: index may not
+    let indexed = map formatResult results
         grouped = groupSortOn snd indexed
         groupToRow g = (snd $ head g, length g, map fst g)
     mapM_ (printRow . groupToRow) grouped
   where
-    formatResult (depth, diff)
-        | diff >= 0.1 = show depth ++ "*"
-        | otherwise = show depth
+    formatResult (seed, depth, diff)
+        | diff >= 0.1 = (seed, show depth ++ "*")
+        | otherwise = (seed, show depth)
     showPadded str = str ++ replicate (6 - length str) ' '
     printRow (depthStr, count, seeds) =
         putStrLn $ showPadded depthStr ++ "| " ++ showPadded (show count) ++ "| " ++ showSeeds seeds
@@ -95,11 +95,11 @@ testBuildMakerRegression = do
             _ <- evaluate df
             putStr ("\rProcessed seed: " ++ show seed ++ " Depth: " ++ show dp ++ "    ")
             hFlush stdout
-            return (dp, df)
+            return (seed, dp, df)
         runSuite name (_,refData) = do
             results <- mapM fmd refData
             printRegressionTable name results
-            return $ all (\(d, _) -> d /= -1) results
+            return $ all (\(_, d, _) -> d /= -1) results
     pass1 <- runSuite "BestBuild 5P (150 cases)" bestBuild_5P_10K_150S
     pass2 <- runSuite "BestBuild 10P (50 cases)" bestBuild_10P_10K_50S
     pass3 <- runSuite "BestBuild 15P (10 cases)" bestBuild_15P_10K_10S
