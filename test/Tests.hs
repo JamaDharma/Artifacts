@@ -20,7 +20,7 @@ import CharacterBuild
       calcStatWeightsC,
       calcStatWeightsB,
       bestBuildStrategic,
-      updateWeights, bestBuildFoldingNew )
+      updateWeights, bestBuildNew, bestBuildFoldingNew )
 import CharacterBuildLegacy (bestBuildLegacy)
 import Progression
 import Generator
