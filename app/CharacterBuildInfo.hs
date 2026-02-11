@@ -249,6 +249,12 @@ bestBuildInfo n c setA offA = bb where
       newBuilds = bmkr newWL
       newMax = maxBy dmg newBuilds
 
+-- Precompute buff storage statline
+makeBuffStatline :: [Stat] -> Double -> Statline
+makeBuffStatline stats rolls = 
+  appendStats zeroStatline converted
+  where
+    converted = map (\s -> statRollToValue (s, rolls)) stats
 -- bestBuildFoldingInfo: single-pass optimization with sensitivity tracking
 -- The state we carry through the fold
 data OptState = OptState
@@ -269,6 +275,9 @@ bestBuildFoldingInfo n c setA offA = bb
     -- Setup constants and helpers
     calc sla = if conditionChecker c sla then stDmgClc c sla else 0
     scaleStats = scaling c
+    -- Precompute once outside the loop
+    plusBuff = makeBuffStatline scaleStats 17    -- All scaling stats +17 rolls
+    minusBuff = makeBuffStatline scaleStats (-17) -- All scaling stats -17 rolls
     -- This is the callback run at every single leaf (BuildInfo)
     -- It updates the Global Max and the Sensitivity Maxes
     optimizer :: (BuildInfo, Statline) -> OptState -> OptState
@@ -281,10 +290,10 @@ bestBuildFoldingInfo n c setA offA = bb
         -- Check Sensitivity: 
         -- What if this build had +17 (approx 2 rolls) of Stat X?
         -- We track the theoretical MAX damage available for that scenario.
-        updateSens (s, currentMax) = (s, max currentMax (calc (dec s 17)))
-        updateSensMin (s, currentMax) = (s, max currentMax (calc (dec s (-17))))
+        updateSens (s, currentMax) = (s, max currentMax (calc (dec s plusBuff)))
+        updateSensMin (s, currentMax) = (s, max currentMax (calc (dec s minusBuff)))
         -- Decorator helper: temporarily add val to stat s
-        dec s val = buffStatline sl s val
+        dec s bs = appendStats sl [(s, statAccessor bs s)]
         newMaxS = map updateSens maxS
         newMinS = map updateSensMin minS
     -- The Loop
