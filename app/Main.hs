@@ -14,6 +14,7 @@ import ExportPlot
 import Control.Monad
 import Control.Concurrent.Async.Extra (mapConcurrentlyBounded)
 import Data.Time.Clock (UTCTime, diffUTCTime, getCurrentTime)
+import CharacterBuildLegacy (bestBuildLegacy)
 
 d2s::Double->String
 d2s = printf "%6.1f"
@@ -75,7 +76,7 @@ weightsIteration sz onA offA (n,oW) = do
   return (n+1,calcStatWeights char bb oW)
 
 char :: Character
-char = nefer --this is global current char
+char = furina --this is global current char
 damage :: Build -> Double
 damage = dmgClc char []
 
@@ -88,14 +89,14 @@ makeProgression :: Character -> Int -> Int -> IO [(Int, Build)]
 makeProgression c artN _ = do
     setArts <- generateArtifacts "GT" artN
     offArts <- generateArtifacts "MS" artN
-    let prg = progression c (bestBuild 7) setArts offArts
+    let prg = progression c (bestBuildLegacy 7) setArts offArts
     putStrLn$ "AllBuilds: "++show (length prg)
     return prg
 
 main :: IO ()
 main = do
   let threads = 3
-  let mlt = 10
+  let mlt = 1
   start <- getCurrentTime
   let mapCB = mapConcurrentlyBounded threads
 
