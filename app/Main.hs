@@ -89,7 +89,7 @@ makeProgression :: Character -> Int -> Int -> IO [(Int, Build)]
 makeProgression c artN _ = do
     setArts <- generateArtifacts "GT" artN
     offArts <- generateArtifacts "MS" artN
-    let prg = progression c (bestBuildLegacy 7) setArts offArts
+    let prg = progression c (bestBuildFoldingNew 7) setArts offArts
     putStrLn$ "AllBuilds: "++show (length prg)
     return prg
 
