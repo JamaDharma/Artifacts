@@ -88,8 +88,8 @@ measureProgression :: IO Bool
 measureProgression = do
     (setArts, offArts) <- generateArts 1
     (t, prg) <- whileMeasuringTime $ do
-      --let prg = progression furina (bestBuildFolding 7) setArts offArts
-      let prg = progression furina (bestBuildLegacy 7) setArts offArts
+      let prg = progression furina (bestBuildFoldingNew 7) setArts offArts
+      --let prg = progression furina (bestBuildLegacy 7) setArts offArts
       putStrLn$ "AllBuilds: "++show (length prg)
       return prg
     print.map fst $ prg
