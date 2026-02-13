@@ -20,7 +20,7 @@ data ArtifactInfo = ArtifactInfo
   , aiMainStat :: !Stat  -- first element of stats
   , aiStatline :: !Statline  -- normalized stats (artifact contribution only)
   , aiOriginal :: Artifact  -- for export/display
-  } deriving (Show)
+  } deriving (Eq,Show)
 
 type BuildInfo = [ArtifactInfo]
 

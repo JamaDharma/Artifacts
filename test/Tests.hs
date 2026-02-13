@@ -22,6 +22,7 @@ import CharacterBuild
       bestBuildStrategic,
       updateWeights, bestBuildNew, bestBuildFoldingNew )
 import CharacterBuildLegacy (bestBuildLegacy)
+import CharacterBuildInfo (bestBuildInfo)
 import Progression
 import Generator
 import ImportGOOD
@@ -69,7 +70,7 @@ playground :: [IO Bool]
 playground = [
               --testMinimisation
               --foldingBestBuilds,
-              measureProgression bestBuildNew
+              measureProgression bestBuildInfo
               --measureAndRecordX
               --testWeightProgression
               --testWeightComparison
@@ -78,6 +79,7 @@ playground = [
               --testFurinaInForest bestBuildNew
             ]
 type BestBuild = Int -> Character -> [Artifact] -> [Artifact] -> Build
+type BestBuildInfo = Int -> Character -> [ArtifactInfo] -> [ArtifactInfo] -> BuildInfo
 
 generateArts :: Int -> IO ([Artifact], [Artifact])
 generateArts n = withDeterministicRandom n $ do
@@ -86,7 +88,7 @@ generateArts n = withDeterministicRandom n $ do
   return (setArts, offArts)
 
 --13.8s 13s 12.7s 10s 7s 6.5s 7.7s
-measureProgression :: BestBuild -> IO Bool
+measureProgression :: BestBuildInfo -> IO Bool
 measureProgression bb = do
     (setArts, offArts) <- generateArts 1
     (t, prg) <- whileMeasuringTime $ do

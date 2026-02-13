@@ -16,6 +16,7 @@ import Control.Monad
 import Control.Concurrent.Async.Extra (mapConcurrentlyBounded)
 import Data.Time.Clock (UTCTime, diffUTCTime, getCurrentTime)
 import CharacterBuildLegacy (bestBuildLegacy)
+import CharacterBuildInfo (bestBuildInfo)
 
 d2s::Double->String
 d2s = printf "%6.1f"
@@ -90,7 +91,7 @@ makeProgression :: Character -> Int -> Int -> IO [(Int, Build)]
 makeProgression c artN _ = do
     setArts <- generateArtifacts "GT" artN
     offArts <- generateArtifacts "MS" artN
-    let prg = progression c (bestBuildNew 7) setArts offArts
+    let prg = progression c (bestBuildInfo 7) setArts offArts
     putStrLn$ "AllBuilds: "++show (length prg)
     return prg
 
