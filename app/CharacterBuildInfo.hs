@@ -113,6 +113,41 @@ fold4pcBuildsInfo :: Character -> ((BuildInfo, Statline) -> a -> a) -> a -> Weig
 fold4pcBuildsInfo c callback initialAcc wl n =
     foldOffpieceBuildsInfo (bestPiecesInfo wl n) c callback initialAcc
 
+-- Traversal infrastructure
+traverseBuildComponents 
+  :: Character
+  -> ((BuildInfo, Double), [Statline])
+  -> BuildComponents 
+  -> ((BuildInfo, Double), [Statline])
+traverseBuildComponents char (bestSoFar, statlinesSoFar) components = 
+  go baseSL components [] bestSoFar statlinesSoFar
+  where
+    baseSL = collectStatsNormalized char (displS char ++ bonusS char)
+    scoreF sl = if conditionChecker char sl then stDmgClc char sl else 0
+    
+    go :: Statline -> [[ArtifactInfo]] -> [ArtifactInfo] 
+       -> (BuildInfo, Double) -> [Statline] 
+       -> ((BuildInfo, Double), [Statline])
+    go accSL [] accArts best@(bestBuild, bestScore) statlines = 
+      let score = scoreF accSL
+          newBest = if score > bestScore 
+                    then (reverse accArts, score)
+                    else best
+      in (newBest, accSL : statlines)
+    
+    go accSL (pieceGroup:rest) accArts bestSoFar statlines =
+      foldl' processPiece (bestSoFar, statlines) pieceGroup
+      where
+        processPiece (currBest, currSLs) art =
+          go (addStatlines accSL (aiStatline art)) rest (art:accArts) currBest currSLs
+
+best4pcStatlines :: Character -> Weightline -> Int -> [ArtifactInfo] -> [ArtifactInfo] 
+                     -> ((BuildInfo, Double), [Statline])
+best4pcStatlines char wl n setA offA =
+  foldl' (traverseBuildComponents char) (([], -1), []) componentSets
+  where
+    componentSets = prepareComponentSets (bestPiecesInfo wl n) setA offA
+
 -- STATLINE HELPERS
 -- Convert BuildInfo to complete Statline (char stats + artifact stats)
 buildInfoToStatline :: Character -> BuildInfo -> Statline
@@ -143,6 +178,11 @@ calcStatWeightsBInfo :: Character -> [BuildInfo] -> [(Stat, Double)] -> [(Stat, 
 calcStatWeightsBInfo c builds = map updateW where
   dmgCalc sl = if conditionChecker c sl then stDmgClc c sl else 0
   statlines = buildStatlinesInfo c builds
+  updateW (s, _) = (s, calcSensitivity dmgCalc statlines s)
+
+calcStatWeightsStatlines :: Character -> [Statline] -> [(Stat, Double)] -> [(Stat, Double)]
+calcStatWeightsStatlines c statlines = map updateW where
+  dmgCalc sl = if conditionChecker c sl then stDmgClc c sl else 0
   updateW (s, _) = (s, calcSensitivity dmgCalc statlines s)
 
 -- Constraint-aware weights calculation
@@ -234,22 +274,19 @@ paretoFilterRealInfo c = concatMap filterPiece . groupSortOn aiPiece
 -- bestBuildInfo: iterative weight refinement
 bestBuildInfo :: Int -> Character -> [ArtifactInfo] -> [ArtifactInfo] -> BuildInfo
 bestBuildInfo n c setA offA = bb where
-  dmg = dmgClc c [] . map aiOriginal
-  bmkr wl = best4pcBuildsInfo wl n setA offA
-  maxBy = maximumBy . comparing
+  bmkr w = best4pcStatlines c w n setA offA
   rollW = zip (scaling c) [1,1..]
   wl = defaultWeightline c
-  firstBuilds = bmkr wl
-  (bb,_,_) = go (maxBy dmg firstBuilds, rollW, firstBuilds)
-  go (oldBest, oldRollW, oldBuilds)
-    | dmg newMax > dmg oldBest = go (newMax, newRollW, newBuilds)
-    | dmg oldBest < 1 = ([], oldRollW, oldBuilds)
-    | otherwise = (oldBest, oldRollW, oldBuilds)
+  firsts = bmkr wl
+  (bb,_) = go firsts rollW
+  go ((oldBest, oldMax), oldBuilds) oldRollW
+    | newMax > oldMax = go news newRollW
+    | oldMax < 1 = ([], oldRollW)
+    | otherwise = (oldBest, oldRollW)
     where
-      newRollW = calcStatWeightsBInfo c oldBuilds oldRollW
+      newRollW = calcStatWeightsStatlines c oldBuilds oldRollW
       newWL = rollsToWeightline newRollW
-      newBuilds = bmkr newWL
-      newMax = maxBy dmg newBuilds
+      news@((_, newMax), _) = bmkr newWL
 
 -- Precompute buff storage statline
 makeBuffStatline :: [Stat] -> Double -> Statline

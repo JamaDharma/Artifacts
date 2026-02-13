@@ -68,14 +68,15 @@ playground :: [IO Bool]
 playground = [
               --testMinimisation
               --foldingBestBuilds,
-              measureProgression
+              measureProgression bestBuildNew
               --measureAndRecordX
               --testWeightProgression
               --testWeightComparison
               --compareX
               --demonstrateX
-              --testFurinaInForest
+              --testFurinaInForest bestBuildNew
             ]
+type BestBuild = Int -> Character -> [Artifact] -> [Artifact] -> Build
 
 generateArts :: Int -> IO ([Artifact], [Artifact])
 generateArts n = withDeterministicRandom n $ do
@@ -84,12 +85,11 @@ generateArts n = withDeterministicRandom n $ do
   return (setArts, offArts)
 
 --13.8s 13s 12.7s 10s 7s 6.5s 7.7s
-measureProgression :: IO Bool
-measureProgression = do
+measureProgression :: BestBuild -> IO Bool
+measureProgression bb = do
     (setArts, offArts) <- generateArts 1
     (t, prg) <- whileMeasuringTime $ do
-      let prg = progression furina (bestBuildFoldingNew 7) setArts offArts
-      --let prg = progression furina (bestBuildLegacy 7) setArts offArts
+      let prg = progression furina (bb 7) setArts offArts
       putStrLn$ "AllBuilds: "++show (length prg)
       return prg
     print.map fst $ prg
@@ -353,8 +353,8 @@ testMyNefer = do
 --fail 10, 46 fails 15 too
 furinaFailureSeeds = [46,98,113,194,241,299,323,351,449,496]
 
-testFurinaInForest :: IO Bool
-testFurinaInForest = do
+testFurinaInForest :: BestBuild -> IO Bool
+testFurinaInForest bb = do
     furinaA <- readGOOD "data/furina.json"
     let dmg = dmgClc furina [] furinaA
     let splitArts = partition ((=="GoldenTroupe").set) furinaA
@@ -362,7 +362,7 @@ testFurinaInForest = do
     let pf  =  paretoFilter furina
     let bm = best4pcBuilds stW 10
     let bm2 s o = let (_,_,b) = updateWeights furina 8 stW s o in b
-    let bm3 s o = [bestBuild 7 furina s o]
+    let bm3 s o = [bb 7 furina s o]
     --let bm2 sp op = bm (pf sp) (pf op)
 
     let dfs = buildsFromSeed (dmgClc furina []) (fst splitArts) (snd splitArts) 10000 bm3
