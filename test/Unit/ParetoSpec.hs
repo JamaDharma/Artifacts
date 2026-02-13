@@ -2,12 +2,13 @@ module Unit.ParetoSpec (spec) where
 import Test.Hspec
 import Test.QuickCheck
 import Character
+import CharacterLibrary
 import CharacterBuild (paretoFilter, paretoFilterReal)
 import Generator (generateArtifactForPiece)
 import System.Random (mkStdGen)
 import Data.List (sort, nub)
 import Control.Monad (replicateM)
-import ArtifactType (Artifact(..), Piece(..), Stat(..))
+import Artifact (Artifact(..), Piece(..), Stat(..))
 -- Helper to create artifacts without set
 mkArtifact :: Piece -> [(Stat, Double)] -> Artifact
 mkArtifact p sts = Artifact { piece = p, set = "", upNumber = 0, stats = sts }

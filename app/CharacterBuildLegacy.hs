@@ -1,6 +1,6 @@
 module CharacterBuildLegacy (bestBuildLegacy) where
 
-import ArtifactType
+import Artifact
 import Character(Character(..))
 import Data.Ord (comparing, Down(..))
 import Data.Array

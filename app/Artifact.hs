@@ -1,4 +1,4 @@
-module ArtifactType (
+module Artifact (
     Build, Piece(..), Stat(..), Artifact(..),
     flatMap,pcntToFlatW,baseStats,artCV,artRV,buildCV,buildV,
     mainStatValue, statRollToValue, statValueToRoll

@@ -1,7 +1,7 @@
 {-# LANGUAGE TupleSections #-}
 module Progression where
 
-import ArtifactType
+import Artifact
 import CharacterBuild
 import Character (Character)
 import Data.Array (elems, Array, (//), listArray)

@@ -2,7 +2,7 @@ module UpgradeSimulator (
     simulateUpgrades
     ) where
 
-import ArtifactType
+import Artifact
 import Character
 import Generator (generateArtifactForPiece)
 import Data.List (group, sort)

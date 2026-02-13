@@ -3,7 +3,7 @@
 
 module ImportGOOD (readGOOD,writeGOOD,readGOODForCharacter) where
 
-import ArtifactType
+import Artifact
 import RollProbability
 import Data.Aeson
 import GHC.Generics

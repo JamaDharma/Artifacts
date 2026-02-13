@@ -1,6 +1,6 @@
 module PerfectBuild where
 
-import ArtifactType
+import Artifact
 import Character
 
 firstDerivatives:: Statline->[(Stat, Double)]

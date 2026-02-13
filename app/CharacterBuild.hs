@@ -1,13 +1,15 @@
 module CharacterBuild where
 
-import ArtifactType
+import Artifact
 import Character
 import CharacterBuildInfo (paretoFilterInfo, paretoFilterRealInfo, bestBuildInfo, bestBuildFoldingInfo)
 import Data.Ord (comparing, Down(..))
 import Data.Array
 import Data.List (maximumBy, minimumBy, foldl')
 import Data.List.Extra (sortOn, groupSortOn, maximumOn)
-import StatlineType
+import Statline
+import Data.Complex (imagPart)
+import Core.Utils (ArtifactInfo(..), toArtifactInfo, collectStatsNormalized)
 
 type ArtifactStorage = ([Artifact], [Artifact])
 

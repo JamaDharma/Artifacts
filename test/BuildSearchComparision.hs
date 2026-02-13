@@ -3,9 +3,10 @@ module BuildSearchComparision
 
 import TestData
 import Control.Exception (evaluate)
-import ArtifactType ( Artifact, Build )
+import Artifact ( Artifact, Build )
 import Data.List.Extra ( group, sort, groupSortOn )
-import Character ( Character(dmgClc), furina )
+import Character ( Character(dmgClc) )
+import CharacterLibrary ( furina )
 import CharacterBuild
     ( bestBuild,bestBuildFolding, paretoFilterReal, bestBuildNew )
 import GeneratorUtils ( artifactsFromSeed, whileMeasuringTime )

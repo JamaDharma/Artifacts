@@ -3,7 +3,7 @@ module Generator (
     generateArtifactForPiece
     ) where
 
-import ArtifactType
+import Artifact
 import Weights
 import Data.List (group,sort)
 import System.Random (randomRIO)

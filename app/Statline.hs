@@ -1,7 +1,7 @@
-module StatlineType where
+module Statline where
 
 import Data.Array ( bounds, inRange, (!) )
-import ArtifactType
+import Artifact
 import Data.List (foldl')
 
 data Statline = Statline

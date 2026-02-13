@@ -1,6 +1,6 @@
 module Weights where
 
-import ArtifactType
+import Artifact
 import Data.Array
 
 pieceWeight :: [(Piece, Double)]

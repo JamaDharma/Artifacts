@@ -1,8 +1,9 @@
 module CharacterBuildInfo where
 
-import ArtifactType
+import Artifact
 import Character
-import StatlineType
+import Statline
+import Core.Utils
 import Data.Ord (comparing, Down(..))
 import Data.Array
 import Data.List (maximumBy, minimumBy, foldl', sortOn)
@@ -10,36 +11,6 @@ import Data.List.Extra (groupSortOn)
 
 -- CORE TYPES
 type ArtifactStorage = ([Artifact], [Artifact])
-
--- Convert roll weights to value Weightline (for core optimization)
--- Core assumes stats are already normalized (no HPf/ATKf/DEFf)
-rollsToWeightline :: [(Stat, Double)] -> Weightline
-rollsToWeightline = foldl' addWeight zeroStatline
-  where
-    -- statValueToRoll on weights converts per-roll to per-value weights
-    -- We're changing 1/roll to 1/value, so usual conversion meaning is inverted
-    toValueW = statValueToRoll
-
-    addWeight wl (stat, rollW) =
-      let (_, valueW) = toValueW (stat, rollW)
-      in case stat of
-        HP  -> wl { slHP  = slHP wl + valueW }
-        ATK -> wl { slATK = slATK wl + valueW }
-        DEF -> wl { slDEF = slDEF wl + valueW }
-        ER  -> wl { slER  = slER wl + valueW }
-        EM  -> wl { slEM  = slEM wl + valueW }
-        CR  -> wl { slCR  = slCR wl + valueW }
-        CD  -> wl { slCD  = slCD wl + valueW }
-        HB  -> wl { slHB  = slHB wl + valueW }
-        DMG -> wl { slDMG = slDMG wl + valueW }
-        HPf  -> error "Flat stats should not appear in core weights"
-        ATKf -> error "Flat stats should not appear in core weights"
-        DEFf -> error "Flat stats should not appear in core weights"
-        DMGb -> error "DMGb not used in weights"
-
--- Default starting weights (1.0 per roll for each scaling stat)
-defaultWeightline :: Character -> Weightline
-defaultWeightline c = rollsToWeightline (zip (scaling c) (repeat 1.0))
 
 -- SCORING (O(1) with Weightline)
 scoreArtifactInfo :: Weightline -> ArtifactInfo -> Double

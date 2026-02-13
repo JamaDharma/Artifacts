@@ -1,11 +1,12 @@
 module Main where
 
 import Control.Exception (evaluate)
-import ArtifactType
+import Artifact
 import Data.List (permutations,partition)
 import Data.List.Extra
 import Data.Array ((!), Array, listArray, array)
-import Character ( Character(name, dmgClc, scaling, stDmgClcUnc), furina, nefer, collectStatsNormalized, statlineDamageCalculator )
+import Character ( Character(name, dmgClc, scaling, stDmgClcUnc), statlineDamageCalculator )
+import CharacterLibrary
 import CharacterBuild
     ( BuildStrategy(BuildStrategy, weightCalculator, character,
                     buildMaker),
@@ -30,7 +31,7 @@ import BuildSearchComparision
 import Text.Printf (printf)
 import System.IO (hFlush, stdout)
 import UpgradeSimulator
-import StatlineType (Statline(slER))
+import Statline
 
 printResult :: String -> Bool -> IO()
 printResult testName result = putStrLn output where

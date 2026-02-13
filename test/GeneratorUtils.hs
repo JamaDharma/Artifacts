@@ -3,9 +3,10 @@ module GeneratorUtils where
 
 import System.Random (mkStdGen, setStdGen, getStdGen)
 import Data.Time.Clock (UTCTime, diffUTCTime, getCurrentTime)
-import ArtifactType
+import Artifact
 import Generator
 import Character
+import CharacterLibrary
 import CharacterBuild
 
 
