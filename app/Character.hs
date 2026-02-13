@@ -7,6 +7,7 @@ module Character(
   getFinalStatline,
   getScalingStatline,
   conditionChecker,
+  statlineDamageCalculator,
   collectStatsNormalized,
   toArtifactInfo
 ) where
@@ -24,7 +25,7 @@ data Character = Character
   , bonusS   :: [(Stat, Double)]--values
   , condition:: [(Stat, Double)]--minimum values
   , dmgClc   :: [(Stat,Double)]->Build->Double
-  , stDmgClc :: Statline->Double
+  , stDmgClcUnc :: Statline->Double
   }
 --structure for high performance core
 data ArtifactInfo = ArtifactInfo
@@ -109,11 +110,11 @@ getScalingStatline c a = combineStats (map fIncS.scaling $ c) where
 
 conditionChecker :: Character -> Statline -> Bool
 conditionChecker c sl = all (\(cs,cv)->statAccessor sl cs >= cv).condition$c
-
+statlineDamageCalculator :: Character->Statline->Double
+statlineDamageCalculator c sl = if conditionChecker c sl then stDmgClcUnc c sl else 0
 characterDamageCalculator :: Character->[(Stat,Double)]->(Build->Double)
 characterDamageCalculator c buff = buildDmg where
-  sdc = stDmgClc c
-  buildDmg build = if conditionChecker c sla then sdc sla else 0
+  buildDmg build = statlineDamageCalculator c sla
     where sla = collectStatsNormalized c (displS c ++ bonusS c ++ buff ++ concatMap stats build)
 
 furina :: Character
@@ -126,7 +127,7 @@ furina = Character{
    bonusS = [(CR,16),(DMG,70+75+28)],--28 is depndent on her hp but whatever
    condition = [(ER,200)],
    dmgClc = characterDamageCalculator furina,
-   stDmgClc = furinaStatlineDmgClc furina
+   stDmgClcUnc = furinaStatlineDmgClc furina
 }
 
 furinaStatlineDmgClc :: Character->(Statline->Double)
@@ -151,7 +152,7 @@ nefer = Character{
    -- 10% Lunar-Bloom CR, 20% Lunar-Bloom CD
    condition = [],  -- no stat requirements
    dmgClc = characterDamageCalculator nefer,
-   stDmgClc = neferStatlineDmgClc nefer
+   stDmgClcUnc = neferStatlineDmgClc nefer
 }
 
 neferStatlineDmgClc :: Character -> (Statline->Double)

@@ -5,7 +5,7 @@ import ArtifactType
 import Data.List (permutations,partition)
 import Data.List.Extra
 import Data.Array ((!), Array, listArray, array)
-import Character ( Character(name, dmgClc, scaling, stDmgClc), furina, nefer, collectStatsNormalized )
+import Character ( Character(name, dmgClc, scaling, stDmgClcUnc), furina, nefer, collectStatsNormalized, statlineDamageCalculator )
 import CharacterBuild
     ( BuildStrategy(BuildStrategy, weightCalculator, character,
                     buildMaker),
@@ -104,7 +104,7 @@ foldingBestBuilds = do
     setArts <- generateArtifacts "GT" 10000
     offArts <- generateArtifacts "MS" 10000
     let ttb = topBuilds furina 10
-    let ecsldc sl = if slER sl < 200 then 0 else stDmgClc furina sl
+    let ecsldc = statlineDamageCalculator furina
     let rollW = extendWeights furina.zip (scaling furina)$[1,1..]
     let bldNrm = best4pcBuilds rollW 7 setArts offArts
     let acc (b,s) a = b:a

@@ -123,7 +123,7 @@ traverseBuildComponents char (bestSoFar, statlinesSoFar) components =
   go baseSL components [] bestSoFar statlinesSoFar
   where
     baseSL = collectStatsNormalized char (displS char ++ bonusS char)
-    scoreF sl = if conditionChecker char sl then stDmgClc char sl else 0
+    scoreF = statlineDamageCalculator char
     
     go :: Statline -> [[ArtifactInfo]] -> [ArtifactInfo] 
        -> (BuildInfo, Double) -> [Statline] 
@@ -176,13 +176,13 @@ calcSensitivity dmgCalc statlines s = (plusDmg - minusDmg) / baseDmg * 100 / 4 w
 -- Balanced weights updater - simple sensitivity analysis
 calcStatWeightsBInfo :: Character -> [BuildInfo] -> [(Stat, Double)] -> [(Stat, Double)]
 calcStatWeightsBInfo c builds = map updateW where
-  dmgCalc sl = if conditionChecker c sl then stDmgClc c sl else 0
+  dmgCalc = statlineDamageCalculator c
   statlines = buildStatlinesInfo c builds
   updateW (s, _) = (s, calcSensitivity dmgCalc statlines s)
 
 calcStatWeightsStatlines :: Character -> [Statline] -> [(Stat, Double)] -> [(Stat, Double)]
 calcStatWeightsStatlines c statlines = map updateW where
-  dmgCalc sl = if conditionChecker c sl then stDmgClc c sl else 0
+  dmgCalc = statlineDamageCalculator c
   updateW (s, _) = (s, calcSensitivity dmgCalc statlines s)
 
 -- Constraint-aware weights calculation
@@ -201,7 +201,7 @@ constraintSlope c statlines (cs,cv) = (cs, if dmg minRD == dmg maxRD then cv els
   maxS = maximumBy (comparing getStat) statlines
   (minR,maxR) = constraintRange (getStat minS) (getStat maxS) cv
   -- Find best build at each range boundary
-  dmg = stDmgClc c
+  dmg = stDmgClcUnc c
   maxDamageR r = maximumBy (comparing dmg) . filter ((>=r).getStat) $ statlines
   minRD = maxDamageR minR
   maxRD = maxDamageR maxR
@@ -219,7 +219,7 @@ calcStatWeightsCInfo c builds = map updateW where
   validStatlines = filter (conditionChecker c) allStatlines
   -- Use valid builds if any, else all (enables weight calc even when no builds meet constraints)
   statlines = if null validStatlines then allStatlines else validStatlines
-  dmgCalc = stDmgClc c
+  dmgCalc = stDmgClcUnc c
   updateW (s, oldW)
     | null cnd = (s, calcSensitivity dmgCalc statlines s)
     | otherwise = constraintSlope c allStatlines (head cnd)
@@ -312,7 +312,7 @@ bestBuildFoldingInfo :: Int -> Character -> [ArtifactInfo] -> [ArtifactInfo] -> 
 bestBuildFoldingInfo n c setA offA = bb
   where
     -- Setup constants and helpers
-    calc sla = if conditionChecker c sla then stDmgClc c sla else 0
+    calc = statlineDamageCalculator c
     scaleStats = scaling c
     -- Precompute once outside the loop
     plusBuff = makeBuffStatline scaleStats 17    -- All scaling stats +17 rolls
