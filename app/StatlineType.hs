@@ -5,15 +5,15 @@ import ArtifactType
 import Data.List (foldl')
 
 data Statline = Statline
-  { slHP  :: !Double
-  , slATK :: !Double
-  , slDEF :: !Double
-  , slER  :: !Double
-  , slEM  :: !Double
-  , slCR  :: !Double
-  , slCD  :: !Double
-  , slHB  :: !Double
-  , slDMG :: !Double
+  { slHP  :: {-# UNPACK #-} !Double
+  , slATK :: {-# UNPACK #-} !Double
+  , slDEF :: {-# UNPACK #-} !Double
+  , slER  :: {-# UNPACK #-} !Double
+  , slEM  :: {-# UNPACK #-} !Double
+  , slCR  :: {-# UNPACK #-} !Double
+  , slCD  :: {-# UNPACK #-} !Double
+  , slHB  :: {-# UNPACK #-} !Double
+  , slDMG :: {-# UNPACK #-} !Double
   } deriving (Show, Eq)
 
 type Weightline = Statline
