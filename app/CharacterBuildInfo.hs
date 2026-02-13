@@ -41,7 +41,6 @@ rollsToWeightline = foldl' addWeight zeroStatline
 defaultWeightline :: Character -> Weightline
 defaultWeightline c = rollsToWeightline (zip (scaling c) (repeat 1.0))
 
-
 -- SCORING (O(1) with Weightline)
 scoreArtifactInfo :: Weightline -> ArtifactInfo -> Double
 scoreArtifactInfo wl ai = weightStatline wl (aiStatline ai)
@@ -64,14 +63,25 @@ pieceAwareExtractorInfo wl depth = map (takeBest . sortByVal) . groupSortOn aiPi
     p = aiPiece (head l)
     n = round (fromIntegral depth * pieceNumMlt!p)
 
+type BuildComponents = [[ArtifactInfo]]  -- list of piece groups for one build variant
+
+prepareComponentSets 
+  :: ([ArtifactInfo] -> [[ArtifactInfo]])  -- extractor (groups and sorts by piece)
+  -> [ArtifactInfo]  -- on-set artifacts
+  -> [ArtifactInfo]  -- off-set artifacts  
+  -> [BuildComponents]
+prepareComponentSets extractor setA offA = variants
+  where
+    pieceT = aiPiece . head
+    setP = extractor setA
+    offP = extractor offA
+    off p = filter ((/=p) . pieceT) setP ++ filter ((==p) . pieceT) offP
+    variants = setP : map (sortOn pieceT . off . pieceT) offP
+
 -- BUILD GENERATION
 offpieceBuildsInfo :: ([ArtifactInfo] -> [[ArtifactInfo]]) -> [ArtifactInfo] -> [ArtifactInfo] -> [BuildInfo]
-offpieceBuildsInfo extractor setA offA = concatMap sequence variants where
-  pieceT = aiPiece . head
-  setP = extractor setA
-  offP = extractor offA
-  off p = filter ((/=p) . pieceT) setP ++ filter ((==p) . pieceT) offP
-  variants = setP : map (sortOn pieceT . off . pieceT) offP
+offpieceBuildsInfo extractor setA offA = 
+  concatMap sequence (prepareComponentSets extractor setA offA)
 
 best4pcBuildsInfo :: Weightline -> Int -> [ArtifactInfo] -> [ArtifactInfo] -> [BuildInfo]
 best4pcBuildsInfo wl n = offpieceBuildsInfo (bestPiecesInfo wl n)
@@ -93,17 +103,9 @@ foldRecursivelySInfo f sl acc (candidates:rest) currentStack =
 -- Generic fold over all 4pc builds using ArtifactInfo
 foldOffpieceBuildsInfo :: ([ArtifactInfo] -> [[ArtifactInfo]]) -> Character -> ((BuildInfo, Statline) -> a -> a) -> a -> [ArtifactInfo] -> [ArtifactInfo] -> a
 foldOffpieceBuildsInfo extractor c callback initialAcc setA offA =
-    foldl' processVariant initialAcc variants
+    foldl' processVariant initialAcc (prepareComponentSets extractor setA offA)
   where
-    -- Pre-calculate base stats once
     baseSL = collectStatsNormalized c (displS c ++ bonusS c)
-    pieceT = aiPiece . head
-    setP = extractor setA
-    offP = extractor offA
-    -- Logic to create variant layers
-    off p = filter ((/=p) . pieceT) setP ++ filter ((==p) . pieceT) offP
-    variants = setP : map (sortOn pieceT . off . pieceT) offP
-    -- Start recursion with base stats and empty BuildInfo
     processVariant acc layers = foldRecursivelySInfo callback baseSL acc layers []
 
 -- Main fold function using ArtifactInfo and Weightline
