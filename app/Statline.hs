@@ -1,6 +1,5 @@
 module Statline where
 
-import Data.Array ( bounds, inRange, (!) )
 import Artifact
 import Data.List (foldl')
 

@@ -17,7 +17,6 @@ import Statline
 import Character
 import Core.Utils
 import Data.Array
-import Data.List (foldl')
 
 characterDamageCalculator :: Character->[(Stat,Double)]->(Build->Double)
 characterDamageCalculator c buff = buildDmg where

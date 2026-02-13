@@ -11,7 +11,6 @@ import Artifact
 import Statline
 
 import Data.Array
-import Data.List (foldl')
 
 data Character = Character
   { name     :: String

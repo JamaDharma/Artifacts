@@ -3,9 +3,9 @@ module Core.Pareto where
 import Artifact
 import Character
 import Statline
-import Core.Utils (ArtifactInfo(..), toArtifactInfo)
+import Core.Utils (ArtifactInfo(..))
 import Data.List.Extra (groupSortOn)
-import Data.Array (Array, accumArray, (!), listArray, (//))
+import Data.Array (Array, accumArray)
 
 --partitioning
 --reverses order of elements while partitioning
@@ -58,34 +58,3 @@ paretoFilterRealInfo :: Character -> [ArtifactInfo] -> [ArtifactInfo]
 paretoFilterRealInfo c = concatMap filterPiece . groupSortOn aiPiece
   where
     filterPiece infos = snd (paretoFilterBothInfo c infos)
-
--- ============================================================================
---  LEGACY / GENERIC IMPLEMENTATION
---  (From CharacterBuild.hs - slower Array indexing access)
--- ============================================================================
-
--- | Generic pareto filter for any type 'a' that can be projected to an Artifact.
-paretoCandidatesOn :: Character -> (a -> Artifact) -> [a] -> [a]
-paretoCandidatesOn c f = go where
-  scl = scaling c
-  -- Assuming getScalingStatline is available from Character/Statline context
-  gss = getScalingStatline c . f 
-  go [] = []
-  go (h:t) = h : go (filter notWorse t) where
-    stlH = gss h
-    notWorse a = any cmpArt scl where
-      stlA = gss a
-      cmpArt s = stlH!s < stlA!s
-
--- | Legacy Pareto Front for raw Artifacts. 
--- Effectively specialized paretoCandidatesOn.
-paretoFront :: Character -> [Artifact] -> [Artifact]
-paretoFront c = go where
-  scl = scaling c
-  gss = getScalingStatline c
-  go [] = []
-  go (h:t) = h : go (filter notWorse t) where
-    stlH = gss h
-    notWorse a = any cmpArt scl where
-      stlA = gss a
-      cmpArt s = stlH!s < stlA!s
