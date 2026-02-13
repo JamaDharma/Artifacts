@@ -4,6 +4,8 @@ import Artifact
 import Character
 import Statline
 import Core.Utils
+import Core.Pareto
+
 import Data.Ord (comparing, Down(..))
 import Data.Array
 import Data.List (maximumBy, minimumBy, foldl', sortOn)
@@ -102,7 +104,7 @@ traverseBuildComponents char (bestSoFar, statlinesSoFar) components =
     go accSL [] accArts best@(bestBuild, bestScore) statlines = 
       let score = scoreF accSL
           newBest = if score > bestScore 
-                    then (reverse accArts, score)
+                    then (reverse accArts, score)--why reverse? Order doesn't matter.. Check if removing reverse improves performabce
                     else best
       in (newBest, accSL : statlines)
     
@@ -199,47 +201,6 @@ calcStatWeightsCInfo c builds = map updateW where
 -- UTILITY
 maxDamageInfo :: Character -> [BuildInfo] -> Double
 maxDamageInfo c = maximum . map (dmgClc c [] . map aiOriginal)
-
---reverses order of elements while partitioning
-partitionOnPieceR :: (a -> Piece) -> [a] -> Array Piece [a]
-partitionOnPieceR f = accumArray (flip (:)) [] (Flower,Circlet) . map (\x -> (f x, x))
---preserves order of elements
-partitionOnPiece :: (a -> Piece) -> [a] -> Array Piece [a]
-partitionOnPiece f = partitionOnPieceR f . reverse
-
--- PARETO FILTERING
--- Pareto filtering using ArtifactInfo (direct Statline comparison, no Array allocation)
--- Returns: (forward-only filtered, full pareto frontier)
--- forward-only: preserves input order, artifacts not dominated when first seen
--- full pareto: maintains pareto optimality, order undefined
-paretoFilterBothInfo :: Character -> [ArtifactInfo] -> ([ArtifactInfo], [ArtifactInfo])
-paretoFilterBothInfo c = go [] []
-  where
-    scl = scaling c
-    -- filtered: current pareto frontier (fully optimal)
-    -- forward: artifacts that passed forward-only filter (input order)
-    go filtered forward [] = (reverse forward, reverse filtered)
-    go filtered forward (a:rest)
-      | isDominated = go filtered forward rest
-      | otherwise = go newFiltered (a:forward) rest
-      where
-        slA = aiStatline a
-        isDominated = any (\f -> dominates (aiStatline f) slA) filtered
-        newFiltered = a : filter (not . dominates slA . aiStatline) filtered
-        -- f dominates a if f >= a on all scaling stats
-        dominates slF slA' = all (\s -> statAccessor slF s >= statAccessor slA' s) scl
-
--- Forward-only filter: partition by piece, apply paretoBoth, extract forward-only
-paretoFilterInfo :: Character -> [ArtifactInfo] -> [ArtifactInfo]
-paretoFilterInfo c = concatMap filterPiece . groupSortOn aiPiece
-  where
-    filterPiece infos = fst (paretoFilterBothInfo c infos)
-
--- Full pareto filter: partition by piece, apply paretoBoth, extract pareto frontier
-paretoFilterRealInfo :: Character -> [ArtifactInfo] -> [ArtifactInfo]
-paretoFilterRealInfo c = concatMap filterPiece . groupSortOn aiPiece
-  where
-    filterPiece infos = snd (paretoFilterBothInfo c infos)
 
 -- MAIN OPTIMIZATION ENTRY POINTS
 -- bestBuildInfo: iterative weight refinement

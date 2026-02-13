@@ -58,6 +58,7 @@ library
   import: warnings
   exposed-modules: 
     Core.Utils,
+    Core.Pareto,
     Artifact,
     Character,
     CharacterBuild,
@@ -81,6 +82,7 @@ executable Artifacts
   main-is: Main.hs
   other-modules: 
     Core.Utils,
+    Core.Pareto,
     Artifact,
     Character,
     CharacterBuild,

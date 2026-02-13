@@ -12,7 +12,6 @@ import CharacterBuild
                     buildMaker),
       bestBuild,
       bestBuildFolding,
-      partitionOnPiece,
       paretoFilter,
       paretoFilterReal,
       best4pcBuilds,
@@ -32,6 +31,7 @@ import Text.Printf (printf)
 import System.IO (hFlush, stdout)
 import UpgradeSimulator
 import Statline
+import Core.Pareto
 
 printResult :: String -> Bool -> IO()
 printResult testName result = putStrLn output where

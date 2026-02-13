@@ -4,6 +4,7 @@ module Progression where
 import Artifact
 import CharacterBuild
 import Character (Character)
+import Core.Pareto
 import Data.Array (elems, Array, (//), listArray)
 import Data.List
 import Data.Ord (comparing, Down (Down))

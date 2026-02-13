@@ -2,7 +2,7 @@ module CharacterBuild where
 
 import Artifact
 import Character
-import CharacterBuildInfo (paretoFilterInfo, paretoFilterRealInfo, bestBuildInfo, bestBuildFoldingInfo)
+import CharacterBuildInfo (bestBuildInfo, bestBuildFoldingInfo)
 import Data.Ord (comparing, Down(..))
 import Data.Array
 import Data.List (maximumBy, minimumBy, foldl')
@@ -10,7 +10,7 @@ import Data.List.Extra (sortOn, groupSortOn, maximumOn)
 import Statline
 import Data.Complex (imagPart)
 import Core.Utils (ArtifactInfo(..), toArtifactInfo, collectStatsNormalized)
-
+import Core.Pareto (paretoFilterInfo, paretoFilterRealInfo, partitionOnPiece)
 type ArtifactStorage = ([Artifact], [Artifact])
 
 data BuildStrategy = BuildStrategy {
@@ -25,35 +25,6 @@ defaultStrategy c n = BuildStrategy {
     buildMaker = \(s,o) w -> best4pcBuilds (extendWeights c w) n s o,
     weightCalculator = calcStatWeightsB c
   }
-
---reverses order of elements while partitioning
-partitionOnPieceR :: (a -> Piece) -> [a] -> Array Piece [a]
-partitionOnPieceR f = accumArray (flip (:)) [] (Flower,Circlet).map (\x -> (f x, x))
---preserves order of elements
-partitionOnPiece :: (a -> Piece) -> [a] -> Array Piece [a]
-partitionOnPiece f = partitionOnPieceR f.reverse
-
-paretoCandidatesOn::Character->(a->Artifact)->[a]->[a]
-paretoCandidatesOn c f = go where
-  scl = scaling c
-  gss = getScalingStatline c.f
-  go [] = []
-  go (h:t) = h:go (filter notWorse t) where
-    stlH = gss h
-    notWorse a = any cmpArt scl where
-      stlA = gss a
-      cmpArt s = stlH!s < stlA!s
-
-paretoFront::Character->[Artifact]->[Artifact]
-paretoFront c = go where
-  scl = scaling c
-  gss = getScalingStatline c
-  go [] = []
-  go (h:t) = h:go (filter notWorse t) where
-    stlH = gss h
-    notWorse a = any cmpArt scl where
-      stlA = gss a
-      cmpArt s = stlH!s < stlA!s
 
 allBuilds :: [Artifact] -> [Build]
 allBuilds = sequence.groupSortOn piece
