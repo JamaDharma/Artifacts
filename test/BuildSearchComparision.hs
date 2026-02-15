@@ -11,6 +11,7 @@ import CharacterBuild
     ( bestBuild,bestBuildFolding, paretoFilterReal, bestBuildNew )
 import GeneratorUtils ( artifactsFromSeed, whileMeasuringTime )
 import System.IO (hFlush, stdout)
+import Data.Char (toLower, toUpper)
 
 type BuildFinder = Int -> [Artifact] -> [Artifact] -> Build
 
@@ -37,14 +38,18 @@ getMeasure bf depth cases = do
 
 getReport :: String -> BuildFinder -> Int -> Int -> IO String
 getReport prefix bf depth cases = do
-    res <- getMeasure bf depth cases
-    let report = prefix ++ "_" ++ show depth ++ "P_10K_" ++ show cases ++ "S = " ++ show res
-    return report
+    (time, results) <- getMeasure bf depth cases
+    let baseName = show depth ++ "P (" ++ show cases ++ " cases)"
+        caseName = toLower (head prefix) : tail prefix ++ "_" ++ show depth ++ "P_10K_" ++ show cases ++ "S"
+        prettyName = toUpper (head prefix) : tail prefix ++ " " ++ baseName
+        line1 = caseName ++ " :: (Double, String, [(Int, Double)])"
+        line2 = caseName ++ " = (" ++ show time ++ ", \"" ++ prettyName ++ "\", " ++ show results ++ ")"
+    return $ line1 ++ "\n" ++ line2
 
 measureAndRecordX :: IO Bool
 measureAndRecordX = do
     let prefix = "bestBuild"
-    let bf depth = bestBuild depth regTestChr
+    let bf depth = bestBuildNew depth regTestChr
     reports <- mapM (uncurry $ getReport prefix bf) [(5,150),(10,50),(15,10)]
     writeFile ("data/" ++ prefix ++ "Report.hs") (unlines reports)
     return True
@@ -84,11 +89,11 @@ printRegressionTable suiteName results = do
         | length ss <= 5 = show ss
         | otherwise = show (take 3 ss) ++ "..." ++ show (reverse $ take 2 $ reverse ss)
 
-testBuildMakerRegression :: IO Bool
-testBuildMakerRegression = do
+testBuildMakerRegression :: [(Double, String, [(Int, Double)])] -> IO Bool
+testBuildMakerRegression testCases = do
     let pf = paretoFilterReal regTestChr
     let bf depth = bestBuildNew depth regTestChr
-    --let bf d set off = bestBuild d regTestChr (pf set) (pf off)
+    --let bf d set off = bestBuildNew d regTestChr (pf set) (pf off)
         maxDepth = 15
         fmd (seed,target) = do
             (dp,df) <- findMinDepth bf seed target maxDepth
@@ -97,11 +102,9 @@ testBuildMakerRegression = do
             putStr ("\rProcessed seed: " ++ show seed ++ " Depth: " ++ show dp ++ "    ")
             hFlush stdout
             return (seed, dp, df)
-        runSuite name (_,refData) = do
+        runSuite (_, name, refData) = do
             results <- mapM fmd refData
             printRegressionTable name results
             return $ all (\(_, d, _) -> d /= -1) results
-    pass1 <- runSuite "BestBuild 5P (150 cases)" bestBuild_5P_10K_150S
-    pass2 <- runSuite "BestBuild 10P (50 cases)" bestBuild_10P_10K_50S
-    pass3 <- runSuite "BestBuild 15P (10 cases)" bestBuild_15P_10K_10S
-    return $ pass1 && pass2 && pass3
+    results <- mapM runSuite testCases
+    return $ and results

@@ -33,6 +33,9 @@ import System.IO (hFlush, stdout)
 import UpgradeSimulator
 import Statline
 import Core.Pareto
+import Core.Utils (rollsToWeightline, defaultWeightline)
+import CharacterBuildInfo (bestPiecesInfo)
+import TestData (smallSet, largeSet)
 
 printResult :: String -> Bool -> IO()
 printResult testName result = putStrLn output where
@@ -64,20 +67,24 @@ regressionTests = [
 heavyTests :: [IO Bool]
 heavyTests = [
     --measureAndRecordX --for data generation
-    --testBuildMakerRegression
+    --testBuildMakerRegression smallSet
+    --testBuildMakerRegression largeSet
   ]
 playground :: [IO Bool]
 playground = [
+              --analyzeArtifactRankings 115
+              --scanForParetoFailures  -- Run to find new failures
+              --diagnoseParetoFailures paretoFailureSeeds  -- Diagnose known failures
               --testMinimisation
               --foldingBestBuilds,
-              measureProgression bestBuildInfo
+              --measureProgression bestBuildInfo
               --measureAndRecordX
               --testWeightProgression
               --testWeightComparison
               --compareX
               --demonstrateX
               --testFurinaInForest bestBuildNew
-            ]
+  ]
 type BestBuild = Int -> Character -> [Artifact] -> [Artifact] -> Build
 type BestBuildInfo = Int -> Character -> [ArtifactInfo] -> [ArtifactInfo] -> BuildInfo
 
@@ -425,16 +432,190 @@ testWeightComparison = do
   (setArts, offArts) <- generateArts 1
   let rollW = zip (scaling furina) [1,1..]
   let builds = best4pcBuilds (extendWeights furina rollW) 7 setArts offArts
-  
+
   putStrLn $ "Number of builds: " ++ show (length builds)
   putStrLn $ "Testing all builds:"
-  
+
   let weights = calcStatWeightsB furina (builds) rollW
   putStrLn "Weights calculated:"
   mapM_ print weights
-  
+
   -- Check if any weight is NaN or Infinity
   let badWeights = filter (\(s,w) -> isNaN w || isInfinite w) weights
   putStrLn $ "Bad weights: " ++ show badWeights
-  
+
   return True
+
+-- DISCOVERY: Scan for pareto failures (like testFurinaInForest pattern)
+scanForParetoFailures :: IO Bool
+scanForParetoFailures = do
+  putStrLn "=== Scanning for Pareto Failures ==="
+  failures <- findFailures 0 0
+  putStrLn $ "\nFound failure seeds: " ++ show failures
+  return True
+  where
+    findFailures :: Int -> Int -> IO [Int]
+    findFailures count seed
+      | count >= 10 = return []
+      | otherwise = do
+          -- Update on same line
+          putStr $ "\rProcessing seed " ++ show seed ++ "... "
+          hFlush stdout
+
+          (hurt, _) <- testSeedForParetoFailure seed
+
+          if hurt then do
+            putStrLn $ "\n Failure found at seed " ++ show seed
+            rest <- findFailures (count + 1) (seed + 1)
+            return (seed : rest)
+          else
+            findFailures count (seed + 1)
+
+    testSeedForParetoFailure :: Int -> IO (Bool, Bool)
+    testSeedForParetoFailure seed = withDeterministicRandom seed $ do
+      (setArts, offArts) <- generateArts seed
+      let c = furina
+          setInfos = map (toArtifactInfo c) setArts
+          offInfos = map (toArtifactInfo c) offArts
+
+          setInfosPareto = paretoFilterRealInfo c setInfos
+          offInfosPareto = paretoFilterRealInfo c offInfos
+
+          dmg7NoPareto = damage $ bestBuildInfo 7 c setInfos offInfos
+          dmg7Pareto   = damage $ bestBuildInfo 7 c setInfosPareto offInfosPareto
+
+          damage = buildInfoToDamage c
+          paretoHurt = dmg7Pareto < dmg7NoPareto
+          fixedByDepth = not paretoHurt || (damage (bestBuildInfo 10 c setInfosPareto offInfosPareto) >= dmg7NoPareto)  -- If no hurt, we don't care about depth fixing
+
+      return (paretoHurt, fixedByDepth)
+
+-- Store discovered failures here (like furinaFailureSeeds)
+paretoFailureSeeds :: [Int]
+paretoFailureSeeds = [115]  -- Fill from scan results
+-- DIAGNOSIS: Deep dive into known failures (takes list of seeds)
+diagnoseParetoFailures :: [Int] -> IO Bool
+diagnoseParetoFailures seeds = do
+  putStrLn "=== Diagnosing Pareto Failures ==="
+  mapM_ diagnoseOne seeds
+  return True
+  where
+    diagnoseOne :: Int -> IO ()
+    diagnoseOne seed = do
+      putStrLn $ "\n========== Seed " ++ show seed ++ " =========="
+
+      (setArts, offArts) <- withDeterministicRandom seed $ generateArts seed
+
+      let c = furina
+          setInfos = map (toArtifactInfo c) setArts
+          offInfos = map (toArtifactInfo c) offArts
+
+          setInfosPareto = paretoFilterRealInfo c setInfos
+          offInfosPareto = paretoFilterRealInfo c offInfos
+
+          build7NoPareto = bestBuildInfo 5 c setInfos offInfos
+          build7Pareto   = bestBuildInfo 5 c setInfosPareto offInfosPareto
+          build10Pareto  = bestBuildInfo 10 c setInfosPareto offInfosPareto
+
+          damage = buildInfoToDamage c
+          dmg7NoPareto = damage build7NoPareto
+          dmg7Pareto   = damage build7Pareto
+          dmg10Pareto  = damage build10Pareto
+
+      -- Report damages
+      putStrLn $ "Build7 NoPareto: " ++ printf "%.0f" dmg7NoPareto
+      putStrLn $ "Build7 Pareto:   " ++ printf "%.0f" dmg7Pareto
+      putStrLn $ "Build10 Pareto:  " ++ printf "%.0f" dmg10Pareto
+
+      let delta = dmg7NoPareto - dmg7Pareto
+      putStrLn $ "Loss from pareto: " ++ printf "%.0f (%.2f%%)" delta (100*delta/dmg7NoPareto)
+
+      -- Check if depth fixes it
+      if dmg10Pareto >= dmg7NoPareto then
+        putStrLn " WEIGHT CONVERGENCE ISSUE (fixed by depth=10)"
+      else do
+        putStrLn " PARETO BUG (not fixed by depth=10)"
+
+        -- Find deleted artifacts that are in optimal build
+        let deletedSet = filter (`notElem` setInfosPareto) setInfos
+            deletedOff = filter (`notElem` offInfosPareto) offInfos
+            allDeleted = deletedSet ++ deletedOff
+            inOptimalBuild = filter (`elem` build7NoPareto) allDeleted
+
+        putStrLn $ "\nDeleted artifacts: " ++ show (length allDeleted)
+        putStrLn $ "Of which in optimal build: " ++ show (length inOptimalBuild)
+
+        if (not $ null inOptimalBuild) then do
+          putStrLn "\nMissing artifacts from optimal build:"
+          mapM_ printArtifactInfo inOptimalBuild
+        else
+          putStrLn "No missing artifacts from optimal build"
+
+    printArtifactInfo :: ArtifactInfo -> IO ()
+    printArtifactInfo ai = do
+      let art = aiOriginal ai
+      putStrLn $ "  " ++ show (piece art) ++ " - " ++ show (aiMainStat ai)
+      putStrLn $ "    Stats: " ++ show (stats art)
+
+buildInfoToDamage :: Character -> BuildInfo -> Double
+buildInfoToDamage c = dmgClc c [].map aiOriginal
+
+analyzeArtifactRankings :: Int -> IO (Bool)
+analyzeArtifactRankings seed = do
+  putStrLn $ "\n========== Analyzing Seed " ++ show seed ++ " =========="
+  
+  (setArts, offArts) <- withDeterministicRandom seed $ generateArts seed
+  
+  let c = furina
+      setInfos = map (toArtifactInfo c) setArts
+      offInfos = map (toArtifactInfo c) offArts
+      
+      setInfosPareto = paretoFilterRealInfo c setInfos
+      offInfosPareto = paretoFilterRealInfo c offInfos
+      
+      -- Get builds at depth 5
+      buildNoPareto = bestBuildInfo 5 c setInfos offInfos
+      buildPareto = bestBuildInfo 5 c setInfosPareto offInfosPareto
+      
+      -- Hardcoded final weights (ER:1.56, HP:1.78, CR:1.96, CD:2.49, DMG:1.82)
+      weights1 = makeWeights [(ER,1.56), (HP,1.78), (CR,1.96), (CD,2.49), (DMG,1.82)]
+      weights0 = defaultWeightline c
+  
+  putStrLn "\n=== NO PARETO === start weights"
+  showBuildRankings c weights0 buildNoPareto setInfos offInfos
+  putStrLn "=== NO PARETO end weights==="
+  showBuildRankings c weights1 buildNoPareto setInfos offInfos
+  
+  putStrLn "\n=== WITH PARETO start weights==="
+  showBuildRankings c weights0 buildNoPareto setInfosPareto offInfosPareto
+  putStrLn "=== WITH PARETO end weights==="
+  showBuildRankings c weights1 buildNoPareto setInfosPareto offInfosPareto
+  return True
+
+showBuildRankings :: Character -> Weightline -> BuildInfo -> [ArtifactInfo] -> [ArtifactInfo] -> IO ()
+showBuildRankings c weights build setInfos offInfos = do
+  -- Get sorted artifacts per piece (separate for set/off)
+  let sortedSet = bestPiecesInfo weights 100 setInfos
+      sortedOff = bestPiecesInfo weights 100 offInfos
+  
+  putStrLn "Build artifact rankings:"
+  mapM_ (findAndPrintRank sortedSet sortedOff) build
+  
+  where
+    findAndPrintRank :: [[ArtifactInfo]] -> [[ArtifactInfo]] -> ArtifactInfo -> IO ()
+    findAndPrintRank sortedSet sortedOff ai = do
+      let art = aiOriginal ai
+          isSet = set art == "GT"  -- Assuming GT is the set
+          sortedPieces = if isSet then sortedSet else sortedOff
+          label = if isSet then "SET" else "OFF"
+          
+          -- Find which list this artifact is in
+          pieceList = head $ filter (any ((== aiPiece ai) . aiPiece)) sortedPieces
+          -- Find position (1-indexed)
+          rank = maybe 0 (+1) $ elemIndex ai pieceList
+      
+      printf "  %s (%s): rank %d/%d - %s\n" 
+        (show $ piece art) label rank (length pieceList) (show $ aiMainStat ai)
+
+makeWeights :: [(Stat, Double)] -> Weightline
+makeWeights ws = rollsToWeightline ws
