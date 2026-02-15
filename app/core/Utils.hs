@@ -1,6 +1,7 @@
 module Core.Utils
   ( ArtifactInfo(..)
   , BuildInfo
+  , BuildComponents
   , toArtifactInfo
   , collectStatsNormalized
   , defaultWeightline
@@ -23,6 +24,7 @@ data ArtifactInfo = ArtifactInfo
   } deriving (Eq,Show)
 
 type BuildInfo = [ArtifactInfo]
+type BuildComponents = [[ArtifactInfo]]  -- list of piece groups for one build variant
 
 toArtifactInfo :: Character -> Artifact -> ArtifactInfo
 toArtifactInfo c art = ArtifactInfo

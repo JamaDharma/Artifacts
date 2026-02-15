@@ -2,7 +2,7 @@ module CharacterBuild where
 
 import Artifact
 import Character
-import CharacterBuildInfo (bestBuildInfo, bestBuildFoldingInfo)
+import CharacterBuildInfo (bestBuildInfo)
 import Data.Ord (comparing, Down(..))
 import Data.Array
 import Data.List (maximumBy, minimumBy, foldl')
@@ -344,10 +344,3 @@ bestBuildNew n c setA offA = map aiOriginal buildInfo
     setInfos = map (toArtifactInfo c) setA
     offInfos = map (toArtifactInfo c) offA
     buildInfo = bestBuildInfo n c setInfos offInfos
-
-bestBuildFoldingNew :: Int -> Character -> [Artifact] -> [Artifact] -> Build
-bestBuildFoldingNew n c setA offA = map aiOriginal buildInfo
-  where
-    setInfos = map (toArtifactInfo c) setA
-    offInfos = map (toArtifactInfo c) offA
-    buildInfo = bestBuildFoldingInfo n c setInfos offInfos

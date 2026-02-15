@@ -8,19 +8,6 @@ import Data.Array ((!), Array, listArray, array)
 import Character ( Character(name, dmgClc, scaling, stDmgClcUnc), statlineDamageCalculator )
 import CharacterLibrary
 import CharacterBuild
-    ( BuildStrategy(BuildStrategy, weightCalculator, character,
-                    buildMaker),
-      bestBuild,
-      bestBuildFolding,
-      paretoFilter,
-      paretoFilterReal,
-      best4pcBuilds,
-      fold4pcBuilds,
-      extendWeights,
-      calcStatWeightsC,
-      calcStatWeightsB,
-      bestBuildStrategic,
-      updateWeights, bestBuildNew, bestBuildFoldingNew )
 import CharacterBuildLegacy (bestBuildLegacy)
 import CharacterBuildInfo (bestBuildInfo)
 import Progression
@@ -33,8 +20,8 @@ import System.IO (hFlush, stdout)
 import UpgradeSimulator
 import Statline
 import Core.Pareto
+import Core.Traversal
 import Core.Utils (rollsToWeightline, defaultWeightline)
-import CharacterBuildInfo (bestPiecesInfo)
 import TestData (smallSet, largeSet)
 
 printResult :: String -> Bool -> IO()

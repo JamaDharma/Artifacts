@@ -59,6 +59,7 @@ library
   exposed-modules: 
     Core.Utils,
     Core.Pareto,
+    Core.Traversal,
     Artifact,
     Character,
     CharacterBuild,
@@ -83,6 +84,7 @@ executable Artifacts
   other-modules: 
     Core.Utils,
     Core.Pareto,
+    Core.Traversal,
     Artifact,
     Character,
     CharacterBuild,

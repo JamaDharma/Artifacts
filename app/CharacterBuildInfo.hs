@@ -5,121 +5,17 @@ import Character
 import Statline
 import Core.Utils
 import Core.Pareto
+import Core.Traversal
 
 import Data.Ord (comparing, Down(..))
 import Data.Array
-import Data.List (maximumBy, minimumBy, foldl', sortOn)
+import Data.List (maximumBy, minimumBy, foldl', sortOn, intercalate)
 import Data.List.Extra (groupSortOn)
+import Debug.Trace
+import Text.Printf (printf)
 
 -- CORE TYPES
 type ArtifactStorage = ([Artifact], [Artifact])
-
--- SCORING (O(1) with Weightline)
-scoreArtifactInfo :: Weightline -> ArtifactInfo -> Double
-scoreArtifactInfo wl ai = weightStatline wl (aiStatline ai)
-{-# INLINE scoreArtifactInfo #-}
-
--- BEST PIECES SELECTION
-bestPiecesInfo :: Weightline -> Int -> [ArtifactInfo] -> [[ArtifactInfo]]
-bestPiecesInfo wl n = map takeBestN . partition where
-  partition = filter (not.null) . elems . partitionOnPiece aiPiece
-  takeBestN = take n . sortOn (Down . scoreArtifactInfo wl)
-
-pieceNumMlt :: Array Piece Double
-pieceNumMlt = array (Flower,Circlet)
-  [(Flower,1.4),(Plume,1.4),(Sands,1),(Goblet,0.5),(Circlet,1)]
-
-pieceAwareExtractorInfo :: Weightline -> Int -> [ArtifactInfo] -> [[ArtifactInfo]]
-pieceAwareExtractorInfo wl depth = map (takeBest . sortByVal) . groupSortOn aiPiece where
-  sortByVal = sortOn (Down . scoreArtifactInfo wl)
-  takeBest l = take n l where
-    p = aiPiece (head l)
-    n = round (fromIntegral depth * pieceNumMlt!p)
-
-type BuildComponents = [[ArtifactInfo]]  -- list of piece groups for one build variant
-
-prepareComponentSets 
-  :: ([ArtifactInfo] -> [[ArtifactInfo]])  -- extractor (groups and sorts by piece)
-  -> [ArtifactInfo]  -- on-set artifacts
-  -> [ArtifactInfo]  -- off-set artifacts  
-  -> [BuildComponents]
-prepareComponentSets extractor setA offA = variants
-  where
-    pieceT = aiPiece . head
-    setP = extractor setA
-    offP = extractor offA
-    off p = filter ((/=p) . pieceT) setP ++ filter ((==p) . pieceT) offP
-    variants = setP : map (sortOn pieceT . off . pieceT) offP
-
--- BUILD GENERATION
-offpieceBuildsInfo :: ([ArtifactInfo] -> [[ArtifactInfo]]) -> [ArtifactInfo] -> [ArtifactInfo] -> [BuildInfo]
-offpieceBuildsInfo extractor setA offA = 
-  concatMap sequence (prepareComponentSets extractor setA offA)
-
-best4pcBuildsInfo :: Weightline -> Int -> [ArtifactInfo] -> [ArtifactInfo] -> [BuildInfo]
-best4pcBuildsInfo wl n = offpieceBuildsInfo (bestPiecesInfo wl n)
-
--- FOLD INFRASTRUCTURE
--- Recursive helper accumulating Statline from ArtifactInfo
--- sl: accumulated Statline (char base + artifacts so far)
--- currentStack: BuildInfo being constructed
-foldRecursivelySInfo :: ((BuildInfo, Statline) -> a -> a) -> Statline -> a -> [[ArtifactInfo]] -> BuildInfo -> a
-foldRecursivelySInfo f sl acc [] currentStack = f (currentStack, sl) acc
-foldRecursivelySInfo f sl acc (candidates:rest) currentStack =
-  foldl' processCandidate acc candidates
-  where
-    processCandidate acc' candidate =
-      -- Accumulate normalized artifact stats (aiStatline already normalized)
-      let newSL = addStatlines sl (aiStatline candidate)
-      in foldRecursivelySInfo f newSL acc' rest (candidate:currentStack)
-
--- Generic fold over all 4pc builds using ArtifactInfo
-foldOffpieceBuildsInfo :: ([ArtifactInfo] -> [[ArtifactInfo]]) -> Character -> ((BuildInfo, Statline) -> a -> a) -> a -> [ArtifactInfo] -> [ArtifactInfo] -> a
-foldOffpieceBuildsInfo extractor c callback initialAcc setA offA =
-    foldl' processVariant initialAcc (prepareComponentSets extractor setA offA)
-  where
-    baseSL = collectStatsNormalized c (displS c ++ bonusS c)
-    processVariant acc layers = foldRecursivelySInfo callback baseSL acc layers []
-
--- Main fold function using ArtifactInfo and Weightline
-fold4pcBuildsInfo :: Character -> ((BuildInfo, Statline) -> a -> a) -> a -> Weightline -> Int -> [ArtifactInfo] -> [ArtifactInfo] -> a
-fold4pcBuildsInfo c callback initialAcc wl n =
-    foldOffpieceBuildsInfo (bestPiecesInfo wl n) c callback initialAcc
-
--- Traversal infrastructure
-traverseBuildComponents 
-  :: Character
-  -> ((BuildInfo, Double), [Statline])
-  -> BuildComponents 
-  -> ((BuildInfo, Double), [Statline])
-traverseBuildComponents char (bestSoFar, statlinesSoFar) components = 
-  go baseSL components [] bestSoFar statlinesSoFar
-  where
-    baseSL = collectStatsNormalized char (displS char ++ bonusS char)
-    scoreF = statlineDamageCalculator char
-    
-    go :: Statline -> [[ArtifactInfo]] -> [ArtifactInfo] 
-       -> (BuildInfo, Double) -> [Statline] 
-       -> ((BuildInfo, Double), [Statline])
-    go accSL [] accArts best@(bestBuild, bestScore) statlines = 
-      let score = scoreF accSL
-          newBest = if score > bestScore 
-                    then (reverse accArts, score)--why reverse? Order doesn't matter.. Check if removing reverse improves performabce
-                    else best
-      in (newBest, accSL : statlines)
-    
-    go accSL (pieceGroup:rest) accArts bestSoFar statlines =
-      foldl' processPiece (bestSoFar, statlines) pieceGroup
-      where
-        processPiece (currBest, currSLs) art =
-          go (addStatlines accSL (aiStatline art)) rest (art:accArts) currBest currSLs
-
-best4pcStatlines :: Character -> Weightline -> Int -> [ArtifactInfo] -> [ArtifactInfo] 
-                     -> ((BuildInfo, Double), [Statline])
-best4pcStatlines char wl n setA offA =
-  foldl' (traverseBuildComponents char) (([], -1), []) componentSets
-  where
-    componentSets = prepareComponentSets (bestPiecesInfo wl n) setA offA
 
 -- STATLINE HELPERS
 -- Convert BuildInfo to complete Statline (char stats + artifact stats)
@@ -211,10 +107,15 @@ bestBuildInfo n c setA offA = bb where
   wl = defaultWeightline c
   firsts = bmkr wl
   (bb,_) = go firsts rollW
+  -- Helper
+  showRW ws = intercalate ", " [show s ++ ":" ++ printf "%.2f" w | (s,w) <- ws]
+  showAll cm (d, w) = printf "%s Damage: %.0f, Weights: %s" cm d (showRW w)
   go ((oldBest, oldMax), oldBuilds) oldRollW
-    | newMax > oldMax = go news newRollW
+    | newMax > oldMax = --trace (showAll "Improved -" (oldMax, oldRollW))$
+      go news newRollW
     | oldMax < 1 = ([], oldRollW)
-    | otherwise = (oldBest, oldRollW)
+    | otherwise = --trace (showAll "Improved -" (oldMax, oldRollW))$trace (showAll "Failed to -" (newMax, newRollW))$
+      (oldBest, oldRollW)
     where
       newRollW = calcStatWeightsStatlines c oldBuilds oldRollW
       newWL = rollsToWeightline newRollW
@@ -226,64 +127,3 @@ makeBuffStatline stats rolls =
   appendStats zeroStatline converted
   where
     converted = map (\s -> statRollToValue (s, rolls)) stats
--- bestBuildFoldingInfo: single-pass optimization with sensitivity tracking
--- The state we carry through the fold
-data OptState = OptState
-  { bestB :: !BuildInfo         -- The absolute best build so far
-  , maxD  :: !Double             -- Damage of bestB
-  , maxSens :: ![(Stat, Double)] -- Max damage found for (+Stat) scenarios
-  , minSens :: ![(Stat, Double)] -- Max damage found for (-Stat) scenarios
-  }
-
--- Helper to create an empty state
-initialOptState :: Character -> OptState
-initialOptState c = OptState [] 0.0 zeroes zeroes
-  where zeroes = map (\s -> (s, 0.0)) (scaling c)
-
-bestBuildFoldingInfo :: Int -> Character -> [ArtifactInfo] -> [ArtifactInfo] -> BuildInfo
-bestBuildFoldingInfo n c setA offA = bb
-  where
-    -- Setup constants and helpers
-    calc = statlineDamageCalculator c
-    scaleStats = scaling c
-    -- Precompute once outside the loop
-    plusBuff = makeBuffStatline scaleStats 17    -- All scaling stats +17 rolls
-    minusBuff = makeBuffStatline scaleStats (-17) -- All scaling stats -17 rolls
-    -- This is the callback run at every single leaf (BuildInfo)
-    -- It updates the Global Max and the Sensitivity Maxes
-    optimizer :: (BuildInfo, Statline) -> OptState -> OptState
-    optimizer (b, sl) (OptState bb md maxS minS) =
-        OptState newBB newMD newMaxS newMinS
-      where
-        dmg = calc sl
-        -- Update Best Build
-        (newBB, newMD) = if dmg > md then (b, dmg) else (bb, md)
-        -- Check Sensitivity: 
-        -- What if this build had +17 (approx 2 rolls) of Stat X?
-        -- We track the theoretical MAX damage available for that scenario.
-        updateSens (s, currentMax) = (s, max currentMax (calc (dec s plusBuff)))
-        updateSensMin (s, currentMax) = (s, max currentMax (calc (dec s minusBuff)))
-        -- Decorator helper: temporarily add val to stat s
-        dec s bs = appendStats sl [(s, statAccessor bs s)]
-        newMaxS = map updateSens maxS
-        newMinS = map updateSensMin minS
-    -- The Loop
-    go :: OptState -> [(Stat, Double)] -> BuildInfo
-    go oldState oldRollW =
-        if newMax > oldMax+0.001 -- Stop if improvement is negligible
-        then go newState newRollW
-        else bestB oldState
-      where
-        oldMax = maxD oldState
-        -- RUN THE FOLD (The heavy lifting happens here)
-        newWL = rollsToWeightline oldRollW
-        newState = fold4pcBuildsInfo c optimizer (initialOptState c) newWL n setA offA
-        newMax = maxD newState
-        -- Calculate new weights based on the data we just collected
-        -- Formula: (MaxWithPlus - MaxWithMinus) / BaseMax
-        newRollW = zipWith calcW (maxSens newState) (minSens newState)
-        calcW (s, plusDmg) (_, minusDmg) =
-             (s, (plusDmg - minusDmg) / newMax * 25) -- *25 is arbitrary scaling factor
-    -- Kickoff
-    startWeights = zip scaleStats [1,1..]
-    bb = go (initialOptState c) startWeights
