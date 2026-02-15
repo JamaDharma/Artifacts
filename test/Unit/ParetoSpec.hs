@@ -3,7 +3,7 @@ import Test.Hspec
 import Test.QuickCheck
 import Character
 import CharacterLibrary
-import CharacterBuild (paretoFilter, paretoFilterReal)
+import Core.Interface (paretoFilter, paretoFilterReal)
 import Generator (generateArtifactForPiece)
 import System.Random (mkStdGen)
 import Data.List (sort, nub)

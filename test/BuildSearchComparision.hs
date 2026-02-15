@@ -7,7 +7,7 @@ import Artifact ( Artifact, Build )
 import Data.List.Extra ( group, sort, groupSortOn )
 import Character ( Character(dmgClc) )
 import CharacterLibrary ( furina )
-import CharacterBuild
+import Core.Interface
     ( bestBuild,bestBuildFolding, paretoFilterReal, bestBuildNew )
 import GeneratorUtils ( artifactsFromSeed, whileMeasuringTime )
 import System.IO (hFlush, stdout)

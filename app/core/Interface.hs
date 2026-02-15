@@ -2,7 +2,7 @@ module Core.Interface where
 
 import Artifact
 import Character
-import CharacterBuildInfo (bestBuildInfo)
+import Core.SearchEngine (bestBuildInfo)
 import Data.Ord (comparing, Down(..))
 import Data.Array
 import Data.List (maximumBy, minimumBy, foldl')

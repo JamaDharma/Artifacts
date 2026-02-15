@@ -7,7 +7,7 @@ import Artifact
 import Generator
 import Character
 import CharacterLibrary
-import CharacterBuild
+import Core.Interface (paretoFilterReal)
 
 
 type BuildMaker = [Artifact] -> [Artifact] -> [[Artifact]]

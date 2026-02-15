@@ -3,8 +3,8 @@ module Main where
 import Artifact
 import Character
 import CharacterLibrary
-import CharacterBuild
-import Progression
+import Core.Interface
+import Core.Progression
 import Generator
 import Data.Ord (Down(..))
 import Data.List.Extra (sortOn)
@@ -15,8 +15,7 @@ import ExportPlot
 import Control.Monad
 import Control.Concurrent.Async.Extra (mapConcurrentlyBounded)
 import Data.Time.Clock (UTCTime, diffUTCTime, getCurrentTime)
-import CharacterBuildLegacy (bestBuildLegacy)
-import CharacterBuildInfo (bestBuildInfo)
+import Core.SearchEngine (bestBuildInfo)
 
 d2s::Double->String
 d2s = printf "%6.1f"

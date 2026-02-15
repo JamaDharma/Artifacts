@@ -7,10 +7,9 @@ import Data.List.Extra
 import Data.Array ((!), Array, listArray, array)
 import Character ( Character(name, dmgClc, scaling, stDmgClcUnc), statlineDamageCalculator )
 import CharacterLibrary
-import CharacterBuild
-import CharacterBuildLegacy (bestBuildLegacy)
-import CharacterBuildInfo (bestBuildInfo)
-import Progression
+import Core.Interface
+import Core.SearchEngine (bestBuildInfo)
+import Core.Progression
 import Generator
 import ImportGOOD
 import GeneratorUtils
