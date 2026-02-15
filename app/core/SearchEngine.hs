@@ -1,4 +1,4 @@
-module CharacterBuildInfo where
+module Core.SearchEngine where
 
 import Artifact
 import Character

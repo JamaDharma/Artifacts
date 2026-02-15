@@ -1,4 +1,4 @@
-module CharacterBuild where
+module Core.Interface where
 
 import Artifact
 import Character

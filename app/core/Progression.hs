@@ -1,5 +1,5 @@
 {-# LANGUAGE TupleSections #-}
-module Progression where
+module Core.Progression where
 
 import Artifact
 import Character
