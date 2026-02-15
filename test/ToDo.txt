@@ -1,0 +1,15 @@
+Feature
+* Progression based artifact evaluation
+Algorithmic optimization
+* Per mainstat search to improve convergence
+* Floor for sum of artifact scores to deepen search
+* Add best single stat artifacts
+* Some simple lagrangian solver
+Low level optimization
+* Vector statlines
+* Store builds prepartitioned
+Refactoring
+* Split build info
+Test
+* Investigation tool for single case
+* MeasureAndRecord improvement
