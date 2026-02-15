@@ -1,174 +1,169 @@
 ================================================================================
-ARTIFACT BUILD OPTIMIZER - PROJECT DIGEST FOR AI ASSISTANCE
+ARTIFACT BUILD OPTIMIZER - AI CONTEXT
 ================================================================================
 
-PROJECT OVERVIEW:
------------------
-Haskell application for optimizing artifact builds in Genshin Impact (gacha game).
-Simulates artifact generation, evaluates build quality, finds optimal combinations,
-and tracks progression over time.
+WHAT IT DOES:
+Find optimal 5-artifact builds for Genshin Impact characters by:
+- Generating artifacts with realistic RNG distributions
+- Scoring via iteratively-refined stat weights
+- Tracking progression (damage vs artifact count)
 
-KEY CONCEPTS:
--------------
-- Artifacts: Equipment pieces with main stat + 4 substats (HP, ATK, DEF, CR, CD, ER, EM, etc.)
-- Builds: Set of 5 artifacts (Flower, Plume, Sands, Goblet, Circlet)
-- Character: Has scaling stats, base stats, damage calculation formula
-- Optimization: Find best 5-piece combination from artifact pool using stat weights
+KEY DOMAIN CONCEPTS:
+- Artifact: {piece, set, mainStat, 4 substats} with 4-5 upgrade rolls (7-10 value each)
+- Build: 5 artifacts (Flower, Plume, Sands, Goblet, Circlet), often needs 4pc set bonus
+- Character: {scaling stats, damage formula, optional constraints like ER>=200%}
+- Optimization: Find best combination from artifact pool using weighted stat sum
 
-CORE MODULES (app/):
--------------------
+ARCHITECTURE:
+Two-tier design separating I/O from optimization:
+1. ARTIFACT LAYER (I/O, display, testing):
+   - Types: Artifact, Build, [(Stat, Double)]
+   - Modules: Artifact.hs, ImportGOOD.hs, Main.hs, Core.Interface.hs
+2. CORE LAYER (hot path, optimized):
+   - Types: ArtifactInfo, BuildInfo, Statline, Weightline
+   - Modules: Core.Utils, Core.Traversal, Core.SearchEngine, Core.Pareto, Core.Progression
+   - Conversion at boundaries: Artifact <-> ArtifactInfo (via toArtifactInfo/aiOriginal)
 
-1. ArtifactType.hs - FUNDAMENTAL DATA TYPES
-   - Piece: Flower|Plume|Goblet|Sands|Circlet
-   - Stat: HPf|ATKf|DEFf|HP|ATK|DEF|ER|EM|CR|CD|HB|DMG|DMGb
-   - Artifact: {piece, set, upNumber, stats}
-   - Build: [Artifact] (list of 5)
-   - Stat conversion functions (rolls ↔ values)
-   - Build evaluation: buildCV (crit value), buildV (stat totals)
+DATA TYPES:
+Core.Utils defines the high-performance types:
+- Stat: HPf/ATKf/DEFf (flat), HP/ATK/DEF/ER/EM/CR/CD/HB/DMG/DMGb (%)
+- Statline: Strict 9-field record {slHP, slATK, slDEF, slER, slEM, slCR, slCD, slHB, slDMG}
+  * O(1) field access via INLINE accessors, no Array overhead
+  * Flat stats normalized before creation (HPf -> HP%, etc)
+  * Used for both stat storage and weight vectors
+- Weightline: Type alias for Statline, enables O(1) dot product scoring
+- ArtifactInfo: {aiPiece, aiMainStat, aiStatline, aiOriginal}
+  * Pre-normalized stats (artifact contribution only, char stats added separately)
+  * Caches piece/mainStat for quick access
+  * aiStatline excludes flat stats (already normalized to %)
+  * aiOriginal preserves Artifact for display/export
+- BuildInfo: [ArtifactInfo] (core representation of a build)
+- BuildComponents: [[ArtifactInfo]] (piece groups for one build variant)
 
-2. Character.hs - CHARACTER DEFINITIONS
-   - Character type with: scaling stats, base stats, damage formula
-   - Statline: Efficient UArray for stat aggregation
-   - Implemented characters: furina, nefer
-   - Functions: getFinalStatline, getShownStat, conditionChecker
-   - Damage calculators: generic dmgClc + character-specific formulas
+CHARACTERS (Character.hs, CharacterLibrary.hs):
+Character.hs: Type definition only (avoids cyclic dependencies)
+  - Data Character with scaling stats, base stats, damage calculator, constraints
+CharacterLibrary.hs: Character instances + ArtifactInfo conversion utilities
+  - furina: HP/ER/CR/CD scaling, 200% ER constraint
+  - nefer: EM/CR/CD scaling, no constraints
+  - collectStatsNormalized: [(Stat,Double)] -> Statline (normalizes HPf->HP%, etc)
+  - toArtifactInfo: Character -> Artifact -> ArtifactInfo (converts + normalizes)
 
-3. Weights.hs - GENERATION PROBABILITIES
-   - pieceWeight: probability distribution for piece types
-   - substatUpgradeNumW: 4 or 5 upgrades (4:1 ratio)
-   - substatWeight: probability for each substat appearing
-   - pieceMSW: main stat weights per piece type (e.g., Circlet can be CR/CD/HP/ATK/DEF/HB/EM)
+CORE OPTIMIZATION MODULES:
 
-4. Generator.hs - ARTIFACT GENERATION
-   - generateArtifact: Random artifact with weighted stats
-   - generateArtifactForPiece: Generate specific piece type
-   - Uses realistic probability distributions from Weights.hs
-   - Simulates substat rolling (7-10 value per roll)
+Core.Utils (type definitions + conversions):
+- ArtifactInfo/BuildInfo type definitions
+- toArtifactInfo: Artifact -> ArtifactInfo (pre-normalize stats for hot path)
+- collectStatsNormalized: Convert [(Stat,Double)] to Statline (flat->% normalization)
+- rollsToWeightline: [(Stat, Double)] -> Weightline (per-roll -> per-value weights)
+- defaultWeightline: Character -> Weightline (initial 1.0 per roll for each scaling stat)
 
-5. CharacterBuild.hs - BUILD OPTIMIZATION (CORE ALGORITHM)
-   - BuildStrategy: configurable build finder
-   - best4pcBuilds: Find top N builds using stat weights
-   - paretoFilter/paretoFront: Remove strictly dominated artifacts
-   - Iterative weight refinement: calcStatWeightsB/C
-   - bestBuild: Main entry point - iteratively improves weights until convergence
-   - artValue: Score artifact by weighted sum of stats
-   - extendWeights: Auto-add flat stat weights (HPf from HP%, etc.)
+Core.Traversal (build enumeration + scoring):
+- traverseBuildComponents: Core fold over all 5-piece combinations
+  * Accumulates Statline incrementally (avoids repeated conversions)
+  * Tracks (best build, best score) + all statlines for weight calculation
+- scoreArtifactInfo: Weightline -> ArtifactInfo -> Double (O(1) dot product)
+- best4pcStatlines: Main search entry
+  * Returns ((BuildInfo, score), [Statline]) for weight refinement
+  * Enumerates on-set + off-piece variants
+- bestPiecesInfo: Take top N artifacts per piece (sorted by score)
+- prepareComponentSets: Generate build variant structure (on-set vs off-piece)
 
-6. Progression.hs - ARTIFACT ACQUISITION SIMULATION
-   - progression: Track best build as artifacts are acquired over time
-   - Uses pareto filtering to reduce search space
-   - Returns [(artifactIndex, bestBuildAtThatPoint)]
-   - statistics: Aggregate multiple progression runs for analysis
+Core.SearchEngine (optimization loop + weight refinement):
+- bestBuildInfo: MAIN ENTRY POINT for optimization
+  * Iterative weight refinement until convergence
+  * Returns BuildInfo (convert to Build via map aiOriginal)
+  * Algorithm:
+    1. Start with equal weights (1.0 per roll for each scaling stat)
+    2. Convert to Weightline (per-roll -> per-value conversion)
+    3. Search for best builds using current weights (best4pcStatlines)
+    4. Calculate new weights via sensitivity analysis (calcStatWeightsStatlines)
+    5. Repeat until damage stops improving
+- calcStatWeightsStatlines: Sensitivity-based weight update
+  * Buff each stat by ±17 rolls (~2 good rolls)
+  * Measure damage slope: (dmg_plus - dmg_minus) / base_dmg * 100 / 4
+  * Tests against all statlines from current search (not just best build)
+- calcStatWeightsCInfo: Constraint-aware weights (experimental, convergence issues)
+- buildInfoToStatline: BuildInfo -> Statline (char stats + artifact stats)
 
-7. UpgradeSimulator.hs - UPGRADE PROBABILITY
-   - simulateUpgrades: Test how many new artifacts needed to upgrade each slot
-   - Respects on-set vs off-set generation rates
-   - Returns upgrade frequency per piece
+Core.Pareto (dominance filtering):
+- paretoFilterRealInfo: Strict Pareto frontier (fully optimal subset)
+  * Artifact A dominates B if A >= B on ALL scaling stats AND A > B on at least one
+  * Returns only non-dominated artifacts
+- paretoFilterInfo: Forward-only filter (preserves artifacts seen first)
+  * Order-dependent: early artifacts stay even if later ones dominate
+  * Used for stable sorting in some contexts
+- Per-piece filtering: Grouping by aiPiece, then filter each group independently
 
-8. RollProbability.hs - ROLL ANALYSIS
-   - analyzeRolls: Estimate artifact upgrade count from substat values
-   - Accounts for probability distributions of roll values (7-10)
+Core.Progression (artifact accumulation simulation):
+- progression: Track best build at each artifact count
+  * Simulates gradual artifact acquisition
+  * Returns [(Int, Build)] - list of (artifact_index, best_build_at_that_point)
+  * Internal: operates on ArtifactInfo, converts at boundaries
+  * Uses reverse-indexed processing + pareto filtering for efficiency
 
-9. ImportGOOD.hs - DATA IMPORT/EXPORT
-   - readGOOD/writeGOOD: Parse JSON artifact data (GOOD format)
-   - readGOODForCharacter: Filter by equipped character
-   - Converts between JSON and internal Artifact type
+Core.Interface (display/test bridge - NOT hot path):
+- bestBuildNew: Wrapper around bestBuildInfo
+  * Handles Artifact -> ArtifactInfo conversion at entry
+  * Converts BuildInfo -> Build at exit (map aiOriginal)
+  * Will likely be renamed to bestBuild
+- paretoFilter/paretoFilterReal: Wrappers for Pareto functions
+  * Convert Artifact -> ArtifactInfo, call Core.Pareto, convert back
+- Legacy/experimental functions (unused):
+  * bestBuild, bestBuildFolding (old implementations, bugs)
+  * BuildStrategy infrastructure (experimental, currently unused)
+  * fold4pcBuilds, best4pcBuilds (old API kept for tests)
 
-10. ExportPlot.hs - VISUALIZATION
-    - writePlotData: Export progression data as JSON for Chart.js
-    - Format: datasets with x (artifact count), y (damage), hover text
+GENERATION (Generator.hs, Weights.hs):
+- Realistic probability distributions for piece/stat/upgrade selection
+- 4:1 ratio for 4 vs 5 upgrades, weighted mainStat per piece type
+- generateArtifactForPiece: targeted generation (used by UpgradeSimulator)
 
-11. Main.hs - SIMULATION RUNNER
-    - Concurrent progression simulation (multiple runs)
-    - Statistical aggregation across runs
-    - Exports plot data for visualization
-    - Current config: runs for 'nefer' character
+SIMULATION (Main.hs):
+- Concurrent runs (10K artifacts x 10 sets) using mapConcurrentlyBounded
+- Uses progression + bestBuildInfo to track damage vs artifact count
+- Exports JSON for Chart.js visualization
 
-TEST MODULES (test/):
---------------------
+IMPORT/EXPORT:
+- ImportGOOD.hs: JSON <-> Artifact conversion (GOOD format), real build loading
+- ExportPlot.hs: progression data -> Chart.js JSON
 
-12. Tests.hs - TEST SUITE
-    - testUpgradeSimulator: Analyze real builds for upgrade difficulty
-    - measureProgression: Performance benchmarks
-    - compareX: Compare optimization strategies
-    - Various validation tests for pareto filtering, partitioning, etc.
+TESTING (test/):
+- Tests.hs: Regression suite, real build analysis, progression benchmarks
+- GeneratorUtils.hs: Deterministic RNG (withDeterministicRandom), timing utilities
+- BuildSearchComparision.hs: Depth regression tests vs recorded benchmarks (TestData.hs)
+- Unit/ParetoSpec.hs: QuickCheck properties for Pareto filtering
 
-13. GeneratorUtils.hs - TEST UTILITIES
-    - whileMeasuringTime: Benchmark wrapper
-    - withDeterministicRandom: Reproducible tests
-    - BuildMaker type aliases and comparison functions
-    - Caution: Changes to Generator.hs functions may invalidate recorded benchmarks
+PERFORMANCE NOTES:
+- Statline: Strict record with INLINE accessors, O(1) dot product, avoids Array overhead
+- ArtifactInfo: Pre-normalized stats (one conversion at entry vs repeated conversions)
+- Weightline dot product: 9 multiplications vs list iteration + lookup
+- Pareto filtering: Can reduce artifact count by ~50% with minimal quality loss
+- Incremental Statline accumulation in traversal (vs rebuilding each time)
 
-14. TestData.hs - BENCHMARK RESULTS
-    - Stored results from previous test runs
+CURRENT ISSUES:
+- calcStatWeightsCInfo (constraint-aware) has convergence issues
+- bestBuildFolding has bugs, unusable
+- BuildStrategy infrastructure experimental/unused
 
-ALGORITHM FLOW:
----------------
-
-1. WEIGHT INITIALIZATION
-   weights = [(stat, initialGuess) for stat in character.scaling]
-
-2. BUILD GENERATION
-   builds = best4pcBuilds(weights, depth, setArtifacts, offArtifacts)
-   - Partition artifacts by piece type
-   - Score each by weighted sum: Σ(stat_value * weight)
-   - Take top N per piece
-   - Generate all combinations (5-choose-5)
-   - Handle 4-piece set bonus (on-set vs off-piece)
-
-3. WEIGHT REFINEMENT
-   newWeights = calcStatWeights(character, builds, oldWeights)
-   - For each stat, add +34 (4 avg rolls) and measure damage increase
-   - Weight ∝ marginal damage increase per roll
-   - Repeat until convergence (damage stops improving)
-
-4. PARETO FILTERING (optional optimization)
-   filtered = paretoFilter(character, artifacts)
-   - For each piece type, remove artifacts that are strictly worse
-   - "Worse" = lower on ALL scaling stats
-   - Dramatically reduces search space
-
-KEY OPTIMIZATION TECHNIQUES:
----------------------------
-- Iterative weight refinement (not one-shot calculation)
-- Pareto filtering to prune search space
-- Piece-aware depth (Goblet gets 0.5x depth due to rarity)
-- Statline caching (UArray for O(1) stat lookup)
-- Constraint handling for minimum stat requirements (e.g., ER >= 200%)
-
-WHEN TO REQUEST SPECIFIC FILES:
--------------------------------
-- Modifying damage formulas → Character.hs
-- Changing optimization logic → CharacterBuild.hs
-- Adding new character → Character.hs + possibly Main.hs
-- Adjusting generation rates → Weights.hs
-- Performance issues → Progression.hs, CharacterBuild.hs
-- Testing/validation → Tests.hs
-- Data import/export → ImportGOOD.hs
-- Visualization → ExportPlot.hs
-
-CURRENT STATE:
---------------
-- Main character being optimized: 'nefer' (EM/CR/CD scaling)
-- Simulation: 10,000 artifacts per set, multiple concurrent runs
-- Output: JSON plot data for damage vs artifact count
-- Test suite includes real build analysis from GOOD format exports
-
-COMMON TASKS:
--------------
-1. Add new character: Define in Character.hs with damage formula
-2. Tune optimization: Adjust depth/strategy in CharacterBuild.hs
-3. Change simulation params: Edit Main.hs (artifact counts, runs)
-4. Analyze real build: Use testUpgradeSimulator in Tests.hs
-5. Benchmark changes: Use GeneratorUtils measurement functions
-
-BUILD SYSTEM:
--------------
-- Cabal package (Artifacts.cabal)
-- Executable: Artifacts (Main.hs entry point)
-- Library: All modules exposed for reuse
-- Test suite: Artifacts-test (Tests.hs)
-- Threading: -threaded, -O2 optimization
-- Dependencies: random, array, containers, extra, bytestring, aeson, async-extra
+QUICK FILE GUIDE:
+Artifact.hs - Core Artifact type, stat conversions, CV/RV helpers
+Statline.hs - Efficient stat container with strict fields + INLINE accessors
+Character.hs - Character type definition (avoids cyclic deps)
+CharacterLibrary.hs - Character instances + ArtifactInfo utilities
+Core.Utils - ArtifactInfo/BuildInfo types, conversions, Weightline helpers
+Core.Traversal - Build enumeration, scoring, search
+Core.SearchEngine - Optimization loop, weight refinement (MAIN LOGIC)
+Core.Pareto - Dominance filtering
+Core.Progression - Track builds over time, aggregate runs
+Core.Interface - Display/test bridge (wrappers for Artifact <-> ArtifactInfo conversion)
+Generator.hs - RNG artifact creation
+Weights.hs - Probability distributions
+Main.hs - Simulation runner
+ImportGOOD.hs - JSON I/O
+ExportPlot.hs - Visualization export
+UpgradeSimulator.hs - Test upgrade difficulty
+RollProbability.hs - Estimate artifact roll counts
+Tests.hs - Test suite
 
 ================================================================================
