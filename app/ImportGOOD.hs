@@ -63,7 +63,7 @@ parsePiece :: String -> Piece
 parsePiece = (forwardMap pieceList Map.!)
 encodePiece :: Piece -> String
 encodePiece = (backwardMap pieceList Map.!)
-
+--Terrible hack: need to implement real damage types
 statList :: BiMap String Stat
 statList = fromLists
   [ ("hp", HPf)
@@ -81,7 +81,9 @@ statList = fromLists
   , ("dmgBonus_", DMGb)
   ]
 parseStat :: String -> Stat
-parseStat = (forwardMap statList Map.!)
+parseStat key = case Map.lookup key (forwardMap statList) of
+  Just stat -> stat
+  Nothing   -> if key == "hydro_dmg_" then DMG else DMGb
 encodeStat :: Stat -> String
 encodeStat = (backwardMap statList Map.!)
 
@@ -113,7 +115,7 @@ readGOODLevelled = readGOODWithFilter ((>= 20) . level)
 
 -- Read artifacts for a specific character (all levels)
 readGOODForCharacter :: String -> String -> IO [Artifact]
-readGOODForCharacter filePath charName = 
+readGOODForCharacter filePath charName =
   readGOODWithFilter ((==charName).location) filePath
 
 -- Convert list of Artifact to json string
