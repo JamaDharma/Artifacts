@@ -45,18 +45,7 @@ runSimulationsIncremental :: Character -> [ArtifactInfo] -> [ArtifactInfo]
 runSimulationsIncremental char realOnSetInfo realOffSetInfo setName genCount numRuns =
   loop 1 []
   where
-    paretoRaw = paretoUnsafeAccum (scaling char) (aiStatline . snd)
-    pareto flt fwd items = (fwdResult, fullResult)
-      where
-        fltByPiece = partitionOnPiece (aiPiece . snd) flt
-        fwdByPiece = partitionOnPiece (aiPiece . snd) fwd
-        itemsByPiece = partitionOnPiece (aiPiece . snd) items
-        allPieces = indices itemsByPiece
-        results = [paretoRaw (lookup p fltByPiece) (lookup p fwdByPiece) (itemsByPiece ! p)
-                  | p <- allPieces]
-        lookup p arr = if inRange (bounds arr) p then arr ! p else []
-        fwdResult = concatMap fst results
-        fullResult = concatMap snd results
+    pareto = paretoOnPiece char snd
     (_, onRealFlt) = pareto [] [] (map (0,) realOnSetInfo)
     (tmp, realMix) = pareto onRealFlt [] (map (0,) realOffSetInfo)
     (offRealFlt, _) = pareto onRealFlt [] (reverse tmp)
@@ -67,24 +56,15 @@ runSimulationsIncremental char realOnSetInfo realOffSetInfo setName genCount num
     -- Returns progression with (0, initialBuild) prepended and (2*genCount, finalBuild) appended
     runSingleProgression :: [(Int, ArtifactInfo)] -> [(Int, ArtifactInfo)] -> [(Int, BuildInfo)]
     runSingleProgression genOnSetIndexed genOffSetIndexed =
-      (0, initialBuildInfo) : progResults ++ [(sentinelIdx, finalBuildInfo)]
+      zip indexes builds
       where
         (onSetAllFwd, _) = pareto onRealFlt onRealFlt genOnSetIndexed
         (offSetAllFwd, _) = pareto realMix offRealFlt genOffSetIndexed
         processedOnSet = sortBy (comparing (Down . fst)) onSetAllFwd
         processedOffSet = sortBy (comparing (Down . fst)) offSetAllFwd
-
-        -- Run core progression
         progResults = progressionInfo char buildSearch processedOnSet processedOffSet
-
-        -- Sentinel index: 2x genCount (estimate for "never replaced")
-        sentinelIdx = 2 * genCount
-
-        -- Final build: last build from progression, or initial if no changes
-        finalBuildInfo = if null progResults
-                         then initialBuildInfo
-                         else snd (last progResults)
-
+        indexes = map fst progResults ++ [genCount*2]
+        builds = initialBuildInfo : map snd progResults
     loop :: Int -> [Map ArtifactInfo Int] -> IO [UpgradeStats]
     loop n accMaps
       | n > numRuns = return $ aggregateStats allRealInfo accMaps
