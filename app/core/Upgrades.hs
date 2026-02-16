@@ -151,14 +151,14 @@ aggregateStats allRealInfo trackingMaps = map computeStats allRealInfo
     computeStats artInfo = UpgradeStats
       { usArtifact = artInfo
       , usReplacementIndices = appearances
-      , usMedianReplacement = if null appearances then 0 else median appearances
-      , usProbability = fromIntegral (length appearances) / fromIntegral numRuns
+      , usMedianReplacement = med
+      , usProbability = prob
       , usRating = fromIntegral med * prob
       }
       where
         appearances = mapMaybe (Map.lookup artInfo) trackingMaps
         med = if null appearances then 0 else median appearances
-        prob = fromIntegral (length appearances) / fromIntegral numRuns
+        prob = if numRuns == 0 then 0.0 else fromIntegral (length appearances) / fromIntegral numRuns
     
     median :: [Int] -> Int
     median xs = sort xs !! (length xs `div` 2)
