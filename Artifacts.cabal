@@ -123,5 +123,5 @@ test-suite unit-tests
   other-modules: Unit.ParetoSpec
   -- This is CRITICAL for the magic "Spec.hs" file to work
   build-tool-depends: hspec-discover:hspec-discover
-  build-depends: base ^>=4.17.2.1, Artifacts, hspec, QuickCheck, array, extra, random
+  build-depends: base ^>=4.17.2.1, Artifacts, hspec, QuickCheck, array, containers, extra, random
   default-language: Haskell2010
