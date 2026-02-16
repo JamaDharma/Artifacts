@@ -63,7 +63,7 @@ runSimulationsIncremental char realOnSetInfo realOffSetInfo setName genCount num
         processedOnSet = sortBy (comparing (Down . fst)) onSetAllFwd
         processedOffSet = sortBy (comparing (Down . fst)) offSetAllFwd
         progResults = progressionInfo char buildSearch processedOnSet processedOffSet
-        indexes = map fst progResults ++ [genCount*2]
+        indexes = map (subtract 1.fst) progResults ++ [genCount*2]
         builds = initialBuildInfo : map snd progResults
     loop :: Int -> [Map ArtifactInfo Int] -> IO [UpgradeStats]
     loop n accMaps
