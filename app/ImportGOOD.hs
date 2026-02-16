@@ -1,7 +1,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module ImportGOOD (readGOOD,writeGOOD,readGOODForCharacter) where
+module ImportGOOD (readGOOD,readGOODLevelled,writeGOOD,readGOODForCharacter) where
 
 import Artifact
 import RollProbability
@@ -96,12 +96,25 @@ jsonToArtifact json = Artifact
       ssts = map substatToStat (substats json)
       substatToStat substat = (parseStat (key substat), value substat)
 
--- Parse JSON file to list of Artifact
-readGOOD :: String -> IO [Artifact]
-readGOOD filePath = do
+-- Generic function to read and filter JSON artifacts
+readGOODWithFilter :: (JSONArtifact -> Bool) -> String -> IO [Artifact]
+readGOODWithFilter filterFunc filePath = do
   jsonString <- BS.readFile filePath
-  let good = fromJust.decode$jsonString
-  return $ map jsonToArtifact (artifacts good)
+  let good = fromJust . decode $ jsonString
+  return $ map jsonToArtifact (filter filterFunc (artifacts good))
+
+-- Parse JSON file to list of all Artifacts
+readGOOD :: String -> IO [Artifact]
+readGOOD = readGOODWithFilter (const True)
+
+-- Parse JSON file to list of Artifacts with level >= 20
+readGOODLevelled :: String -> IO [Artifact]
+readGOODLevelled = readGOODWithFilter ((>= 20) . level)
+
+-- Read artifacts for a specific character (all levels)
+readGOODForCharacter :: String -> String -> IO [Artifact]
+readGOODForCharacter filePath charName = 
+  readGOODWithFilter ((==charName).location) filePath
 
 -- Convert list of Artifact to json string
 encodeGOOD :: [Artifact] -> ByteString
@@ -125,12 +138,3 @@ encodeGOOD arts = encode JSONGOOD
 -- Write list of Artifact to file as json in GOOD format
 writeGOOD :: String -> [Artifact] -> IO ()
 writeGOOD filePath arts = BS.writeFile filePath (encodeGOOD arts)
-
-filterByCharacter :: String -> [JSONArtifact] -> [Artifact]
-filterByCharacter charName = map jsonToArtifact . filter ((== charName) . location)
-
-readGOODForCharacter :: String -> String -> IO [Artifact]
-readGOODForCharacter filePath charName = do
-  jsonString <- BS.readFile filePath
-  let good = fromJust.decode $ jsonString
-  return $ filterByCharacter charName (artifacts good)
