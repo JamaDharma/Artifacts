@@ -1,3 +1,5 @@
+Fix
+* GOOD import/export
 Feature
 * Progression based artifact evaluation
 Algorithmic optimization

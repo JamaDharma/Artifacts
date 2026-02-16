@@ -80,7 +80,7 @@ Core.SearchEngine (optimization loop + weight refinement):
     4. Calculate new weights via sensitivity analysis (calcStatWeightsStatlines)
     5. Repeat until damage stops improving
 - calcStatWeightsStatlines: Sensitivity-based weight update
-  * Buff each stat by ±17 rolls (~2 good rolls)
+  * Buff each stat by Â±17 rolls (~2 good rolls)
   * Measure damage slope: (dmg_plus - dmg_minus) / base_dmg * 100 / 4
   * Tests against all statlines from current search (not just best build)
 - calcStatWeightsCInfo: Constraint-aware weights (experimental, convergence issues)
@@ -126,7 +126,22 @@ SIMULATION (Main.hs):
 
 IMPORT/EXPORT:
 - ImportGOOD.hs: JSON <-> Artifact conversion (GOOD format), real build loading
+  * readGOODLevelled: loads only level 20 artifacts (used by upgrade simulator)
+  * WARNING: Elemental damage bonuses (Hydro/Pyro/etc DMG%) hardcoded to HP% (Furina-specific hack)
+  * This affects import accuracy for characters using elemental goblets
 - ExportPlot.hs: progression data -> Chart.js JSON
+
+UPGRADE SIMULATOR (Core.Upgrades):
+- simulateUpgrades: Main entry point for artifact replacement analysis
+  * Loads real artifacts from GOOD format, runs N progression simulations
+  * Tracks when each artifact stops appearing in optimal builds
+  * Returns statistics: median replacement index, probability, rating
+- Key design: Real artifacts indexed at 0, generated at 1..N for progression tracking
+- Tracking: Map ArtifactInfo Int, uses custom Eq/Ord (includes set for identity)
+- Statistics: aggregateStats computes median/probability across runs
+  * Rating = median * probability (sort key: high = hard to replace)
+  * Hidden gems: artifacts not in initial build but appear later (prob < 1.0)
+- Output: Table sorted by rating (keepers first, easy replacements last)
 
 TESTING (test/):
 - Tests.hs: Regression suite, real build analysis, progression benchmarks
