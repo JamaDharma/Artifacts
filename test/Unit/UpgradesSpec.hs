@@ -131,3 +131,97 @@ spec = do
       
       usMedianReplacement result `shouldBe` 200
       usProbability result `shouldBe` 1.0
+  
+  describe "full tracking simulation" $ do
+    it "simulates progression with real and generated artifacts" $ do
+      -- Setup: 3 real artifacts, 2 generated (with different stats)
+      let realArt1 = mkTestArtifact Flower HP "TestSet"  -- CR:10, CD:20
+          realArt2 = mkTestArtifact Plume ATK "TestSet"
+          realArt3 = mkTestArtifact Sands ER "TestSet"
+          -- Generated artifacts have better substats
+          genArt1 = Artifact { piece = Flower, set = "TestSet", stats = [(HP, 100.0), (CR, 15.0), (CD, 25.0)], upNumber = 4 }
+          genArt2 = mkTestArtifact Goblet DMG "TestSet"
+          
+          realInfo1 = toArtifactInfo undefined realArt1
+          realInfo2 = toArtifactInfo undefined realArt2
+          realInfo3 = toArtifactInfo undefined realArt3
+          genInfo1 = toArtifactInfo undefined genArt1
+          genInfo2 = toArtifactInfo undefined genArt2
+          
+          allRealInfo = [realInfo1, realInfo2, realInfo3]
+          
+          -- Simulate progression:
+          -- Index 0: Initial build with real artifacts
+          -- Index 150: genArt1 replaces realArt1
+          -- Index 300: genArt2 joins
+          -- Index 500: Final state
+          progression = 
+            [ (0, [realInfo1, realInfo2, realInfo3])
+            , (150, [genInfo1, realInfo2, realInfo3])  -- realInfo1 replaced
+            , (300, [genInfo1, realInfo2, realInfo3, genInfo2])
+            , (500, [genInfo1, realInfo2, genInfo2])  -- realInfo3 gone
+            ]
+          
+          tracked = trackLastSeen progression
+          stats = aggregateStats allRealInfo [tracked]
+      
+      -- Verify tracking
+      Map.lookup realInfo1 tracked `shouldBe` Just 0    -- Replaced immediately
+      Map.lookup realInfo2 tracked `shouldBe` Just 500  -- Kept till end
+      Map.lookup realInfo3 tracked `shouldBe` Just 300  -- Replaced at 300
+      Map.lookup genInfo1 tracked `shouldBe` Just 500   -- Generated, in final
+      Map.lookup genInfo2 tracked `shouldBe` Just 500   -- Generated, in final
+      
+      -- Verify stats for real artifacts only
+      length stats `shouldBe` 3
+      let [stat1, stat2, stat3] = stats
+      
+      -- realInfo1: appeared once, replaced at 0
+      usReplacementIndices stat1 `shouldBe` [0]
+      usMedianReplacement stat1 `shouldBe` 0
+      usProbability stat1 `shouldBe` 1.0
+      
+      -- realInfo2: never replaced
+      usReplacementIndices stat2 `shouldBe` [500]
+      usMedianReplacement stat2 `shouldBe` 500
+      usProbability stat2 `shouldBe` 1.0
+      
+      -- realInfo3: replaced at 300
+      usReplacementIndices stat3 `shouldBe` [300]
+      usMedianReplacement stat3 `shouldBe` 300
+      usProbability stat3 `shouldBe` 1.0
+    
+    it "tracks hidden gem that appears only in some runs" $ do
+      let realArt1 = mkTestArtifact Flower HP "TestSet"
+          realArt2 = mkTestArtifact Plume ATK "TestSet"
+          realArt3 = mkTestArtifact Sands ER "TestSet"  -- Hidden gem
+          
+          realInfo1 = toArtifactInfo undefined realArt1
+          realInfo2 = toArtifactInfo undefined realArt2
+          realInfo3 = toArtifactInfo undefined realArt3
+          
+          allRealInfo = [realInfo1, realInfo2, realInfo3]
+          
+          -- Run 1: realInfo3 never appears
+          prog1 = [(0, [realInfo1, realInfo2]), (500, [realInfo1, realInfo2])]
+          
+          -- Run 2: realInfo3 becomes useful at 200
+          prog2 = [(0, [realInfo1, realInfo2]), (200, [realInfo1, realInfo2, realInfo3]), (500, [realInfo1, realInfo2, realInfo3])]
+          
+          -- Run 3: realInfo3 appears early, stays till end
+          prog3 = [(0, [realInfo1, realInfo2, realInfo3]), (500, [realInfo1, realInfo2, realInfo3])]
+          
+          tracked1 = trackLastSeen prog1
+          tracked2 = trackLastSeen prog2
+          tracked3 = trackLastSeen prog3
+          
+          stats = aggregateStats allRealInfo [tracked1, tracked2, tracked3]
+          stat3 = stats !! 2  -- Stats for realInfo3
+      
+      -- realInfo3 appears in 2 out of 3 runs
+      length (usReplacementIndices stat3) `shouldBe` 2
+      usProbability stat3 `shouldBe` (2.0 / 3.0)
+      usMedianReplacement stat3 `shouldBe` 500  -- Median of [500, 500]
+      
+      -- Rating should reflect it's a hidden gem
+      usRating stat3 `shouldBe` 500 * (2.0 / 3.0)
