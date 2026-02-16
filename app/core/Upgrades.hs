@@ -3,58 +3,99 @@ module Core.Upgrades where
 
 import Artifact
 import Character
-import Core.Utils (toArtifactInfo, aiOriginal, BuildInfo, ArtifactInfo)
+import Core.Utils (toArtifactInfo, aiOriginal, BuildInfo, ArtifactInfo (..))
 import Core.SearchEngine (bestBuildInfo)
-import Core.Progression (progression)
+import Core.Progression (progression, progressionInfo)
+import ImportGOOD (readGOODLevelled)
+import Generator (generateArtifacts)
 import qualified Data.Map.Strict as Map
 import Data.Map.Strict (Map)
-import Data.List (sortBy, sort)
+import Data.List (sortBy, sort, foldl')
 import Data.Ord (comparing, Down(..))
 import Data.Maybe (mapMaybe)
+import Text.Printf (printf)
+import Core.Pareto
+import Data.Array
 
 -- | Main entry point: loads artifacts, runs simulation, prints incremental results
 -- Returns final statistics for recording/further processing
 simulateUpgrades :: Character -> String -> String -> Int -> Int -> IO [UpgradeStats]
 simulateUpgrades char goodFilePath setName genCount numRuns = do
-  -- Load and filter artifacts
-  allArtifacts <- undefined -- TODO: loadGOOD goodFilePath
-  let level20Arts = filter isMaxLevel allArtifacts
-      (realOnSet, realOffSet) = partitionBySet setName level20Arts
+  -- Load and filter artifacts (readGOODLevelled already filters level 20)
+  allArtifacts <- readGOODLevelled goodFilePath
+  let (realOnSet, realOffSet) = partitionBySet setName allArtifacts
+      -- Convert to ArtifactInfo immediately
+      realOnSetInfo = map (toArtifactInfo char) realOnSet
+      realOffSetInfo = map (toArtifactInfo char) realOffSet
+      allRealInfo = realOnSetInfo ++ realOffSetInfo
   
   -- Compute initial build once (deterministic)
-  let initialBuild = map aiOriginal $ bestBuildInfo char 
-                       (map (toArtifactInfo char) realOnSet)
-                       (map (toArtifactInfo char) realOffSet)
+  let initialBuildInfo = bestBuildInfo 7 char realOnSetInfo realOffSetInfo
   
   putStrLn $ "Initial build computed. Starting " ++ show numRuns ++ " runs..."
   putStrLn ""
   
   -- Run simulations with incremental reporting
-  finalStats <- runSimulationsIncremental char realOnSet realOffSet 
-                  (realOnSet ++ realOffSet) setName genCount numRuns
+  finalStats <- runSimulationsIncremental char realOnSetInfo realOffSetInfo 
+                  allRealInfo setName genCount numRuns
   
+  -- TODO: Convert finalStats back to Artifact for display
   return finalStats
 
 -- | Run N simulations, printing statistics after each
 -- Accumulates tracking maps and updates display incrementally
-runSimulationsIncremental :: Character -> [Artifact] -> [Artifact] -> [Artifact]
+runSimulationsIncremental :: Character -> [ArtifactInfo] -> [ArtifactInfo] -> [ArtifactInfo]
                           -> String -> Int -> Int -> IO [UpgradeStats]
-runSimulationsIncremental char realOnSet realOffSet allRealArts setName genCount numRuns = 
+runSimulationsIncremental char realOnSetInfo realOffSetInfo allRealInfo setName genCount numRuns = 
   loop 1 []
   where
-    -- Compute initial build once for probability calculation
-    initialBuild = map aiOriginal $ bestBuildInfo char 
-                     (map (toArtifactInfo char) realOnSet)
-                     (map (toArtifactInfo char) realOffSet)
+    -- Compute initial build once
+    initialBuildInfo = bestBuildInfo 7 char realOnSetInfo realOffSetInfo
     
-    loop :: Int -> [Map Artifact Int] -> IO [UpgradeStats]
+    -- Index real artifacts once (all at index 0)
+    realOnSetIndexed = map (0,) realOnSetInfo
+    realOffSetIndexed = map (0,) realOffSetInfo
+    
+    -- Internal: run single progression with boundaries
+    -- Returns progression with (0, initialBuild) prepended and (2*genCount, finalBuild) appended
+    runSingleProgression :: [(Int, ArtifactInfo)] -> [(Int, ArtifactInfo)] -> [(Int, BuildInfo)]
+    runSingleProgression genOnSetIndexed genOffSetIndexed =
+      (0, initialBuildInfo) : progResults ++ [(sentinelIdx, finalBuildInfo)]
+      where
+        -- Combine real (index 0) + generated (indices 1..N)
+        onSetIndexed = realOnSetIndexed ++ genOnSetIndexed
+        offSetIndexed = realOffSetIndexed ++ genOffSetIndexed
+        
+        -- Pareto filter by piece, then reverse sort by index
+        processArtifacts indexed = reverseSorted . paretoFiltered $ indexed
+          where
+            paretoFiltered = concatMap filterPiece . elems . partitionOnPiece (aiPiece . snd)
+            filterPiece pairs = fst (paretoBothOn char (aiStatline . snd) pairs)
+            reverseSorted = sortBy (comparing (Down . fst))
+        
+        processedOnSet = processArtifacts onSetIndexed
+        processedOffSet = processArtifacts offSetIndexed
+        
+        -- Run core progression
+        progResults = progressionInfo char (bestBuildInfo 7) processedOnSet processedOffSet
+        
+        -- Sentinel index: 2x genCount (estimate for "never replaced")
+        sentinelIdx = 2 * genCount
+        
+        -- Final build: last build from progression, or initial if no changes
+        finalBuildInfo = if null progResults 
+                         then initialBuildInfo
+                         else snd (last progResults)
+    
+    loop :: Int -> [Map ArtifactInfo Int] -> IO [UpgradeStats]
     loop n accMaps
-      | n > numRuns = return $ aggregateStats allRealArts accMaps
+      | n > numRuns = return $ aggregateStats allRealInfo accMaps
       | otherwise = do
-          -- Run single progression
-          let (genOnSet, genOffSet) = generateIndexedArtifacts char setName genCount
-              progResult = runSingleProgression char initialBuild 
-                             realOnSet realOffSet genOnSet genOffSet genCount
+          -- Generate indexed artifacts
+          (genOnSetIndexed, genOffSetIndexed) <- generateIndexedArtifacts char setName genCount
+          
+          -- Run progression
+          let progResult = runSingleProgression genOnSetIndexed genOffSetIndexed
               lastSeenMap = trackLastSeen progResult
               updatedMaps = lastSeenMap : accMaps
           
@@ -62,53 +103,37 @@ runSimulationsIncremental char realOnSet realOffSet allRealArts setName genCount
           printProgressUpdate n numRuns
           
           -- Print current statistics
-          let currentStats = aggregateStats allRealArts updatedMaps
+          let currentStats = aggregateStats allRealInfo updatedMaps
           putStrLn $ formatStatsTable currentStats
           putStrLn ""
           
           -- Continue
           loop (n+1) updatedMaps
 
--- | Run single progression with boundary conditions
--- Returns progression with (0, initialBuild) prepended and (2*genCount, finalBuild) appended
-runSingleProgression :: Character -> Build -> [Artifact] -> [Artifact] 
-                     -> [Artifact] -> [Artifact] -> Int -> [(Int, Build)]
-runSingleProgression char initialBuild realOnSet realOffSet genOnSet genOffSet genCount =
-  (0, initialBuild) : progResults ++ [(sentinelIdx, finalBuild)]
-  where
-    -- Run core progression (skips index 0, stops at last change)
-    progResults = progression char bestBuildInfo 
-                    (realOnSet ++ genOnSet) (realOffSet ++ genOffSet)
-    
-    -- Sentinel index: 2x genCount (estimate for "never replaced")
-    sentinelIdx = 2 * genCount
-    
-    -- Final build: last build from progression, or initial if no changes
-    finalBuild = if null progResults 
-                 then initialBuild
-                 else snd (last progResults)
-
--- | Generate N artifacts for both on-set and off-set
--- Uses Generator.generateArtifactForPiece under the hood
-generateIndexedArtifacts :: Character -> String -> Int -> ([Artifact], [Artifact])
-generateIndexedArtifacts char setName count = 
-  undefined -- TODO: call Generator.generateArtifactForPiece
-  -- Should return (onSetGenerated, offSetGenerated)
-  -- On-set artifacts have `asSet = setName`
-  -- Off-set artifacts can be any other set (doesn't matter which)
+-- | Generate N artifacts for both on-set and off-set, indexed 1..N
+-- Returns indexed ArtifactInfo ready for progressionInfo
+generateIndexedArtifacts :: Character -> String -> Int -> IO ([(Int, ArtifactInfo)], [(Int, ArtifactInfo)])
+generateIndexedArtifacts char setName count = do
+  onSetArts <- generateArtifacts setName count
+  offSetArts <- generateArtifacts "off set" count
+  let onSetInfo = map (toArtifactInfo char) onSetArts
+      offSetInfo = map (toArtifactInfo char) offSetArts
+      onSetIndexed = zip [1..] onSetInfo
+      offSetIndexed = zip [1..] offSetInfo
+  return (onSetIndexed, offSetIndexed)
 
 -- | Extract last-seen index for each artifact across all builds
 -- Key insight: Map.insert overwrites, so later appearances update the index
-trackLastSeen :: [(Int, Build)] -> Map Artifact Int
+trackLastSeen :: [(Int, BuildInfo)] -> Map ArtifactInfo Int
 trackLastSeen snapshots = foldl' updateWithBuild Map.empty snapshots
   where
-    updateWithBuild :: Map Artifact Int -> (Int, Build) -> Map Artifact Int
-    updateWithBuild acc (idx, build) = 
-      foldl' (\m art -> Map.insert art idx m) acc build
+    updateWithBuild :: Map ArtifactInfo Int -> (Int, BuildInfo) -> Map ArtifactInfo Int
+    updateWithBuild acc (idx, buildInfo) = 
+      foldl' (\m artInfo -> Map.insert artInfo idx m) acc buildInfo
 
 -- | Statistics for a single artifact across multiple runs
 data UpgradeStats = UpgradeStats
-  { usArtifact :: Artifact           -- The artifact itself
+  { usArtifact :: ArtifactInfo       -- The artifact itself (as ArtifactInfo)
   , usReplacementIndices :: [Int]    -- Last-seen indices from each run
   , usMedianReplacement :: Int       -- Median of replacement indices
   , usProbability :: Double          -- Fraction of runs where artifact appeared
@@ -117,21 +142,21 @@ data UpgradeStats = UpgradeStats
 
 -- | Aggregate tracking maps into statistics for all real artifacts
 -- Artifacts never appearing in any build get empty replacement indices
-aggregateStats :: [Artifact] -> [Map Artifact Int] -> [UpgradeStats]
-aggregateStats allRealArts trackingMaps = map computeStats allRealArts
+aggregateStats :: [ArtifactInfo] -> [Map ArtifactInfo Int] -> [UpgradeStats]
+aggregateStats allRealInfo trackingMaps = map computeStats allRealInfo
   where
     numRuns = length trackingMaps
     
-    computeStats :: Artifact -> UpgradeStats
-    computeStats art = UpgradeStats
-      { usArtifact = art
+    computeStats :: ArtifactInfo -> UpgradeStats
+    computeStats artInfo = UpgradeStats
+      { usArtifact = artInfo
       , usReplacementIndices = appearances
       , usMedianReplacement = if null appearances then 0 else median appearances
       , usProbability = fromIntegral (length appearances) / fromIntegral numRuns
       , usRating = fromIntegral med * prob
       }
       where
-        appearances = mapMaybe (`Map.lookup` art) trackingMaps
+        appearances = mapMaybe (Map.lookup artInfo) trackingMaps
         med = if null appearances then 0 else median appearances
         prob = fromIntegral (length appearances) / fromIntegral numRuns
     
@@ -170,30 +195,23 @@ formatStatsTable stats =
       formatArtifact (usArtifact us)
     
     -- Format artifact: Piece MainStat CV:XX.X
-    formatArtifact :: Artifact -> String
-    formatArtifact art = 
-      show (asPiece art) ++ " " ++
-      show (asMainStat art) ++ " " ++
-      "CV:" ++ printf "%.1f" (undefined :: Double) -- TODO: calculate CV
+    formatArtifact :: ArtifactInfo -> String
+    formatArtifact artInfo = 
+      let art = aiOriginal artInfo
+      in show (piece art) ++ " " ++
+         "CV:" ++ printf "%.1f" (artCV art)
     
     padRight :: Int -> String -> String
     padRight n s = s ++ replicate (n - length s) ' '
-    
-    printf :: String -> Double -> String
-    printf = undefined -- TODO: proper formatting
 
 -- | Print progress indicator between runs
 printProgressUpdate :: Int -> Int -> IO ()
 printProgressUpdate current total = 
   putStrLn $ "=== Completed run " ++ show current ++ "/" ++ show total ++ " ==="
 
--- | Filter artifacts to level 20 only (4+ substats = all upgrades received)
-isMaxLevel :: Artifact -> Bool
-isMaxLevel art = length (filter (/= NoSubStat) (asSubStats art)) >= 4
-
 -- | Partition artifacts by set name into on-set vs off-set
 partitionBySet :: String -> [Artifact] -> ([Artifact], [Artifact])
 partitionBySet setName arts = (onSet, offSet)
   where
-    onSet = filter (\a -> asSet a == setName) arts
-    offSet = filter (\a -> asSet a /= setName) arts
+    onSet = filter (\a -> set a == setName) arts
+    offSet = filter (\a -> set a /= setName) arts

@@ -16,7 +16,7 @@ import GeneratorUtils
 import BuildSearchComparision
 import Text.Printf (printf)
 import System.IO (hFlush, stdout)
-import UpgradeSimulator
+import Core.Upgrades
 import Statline
 import Core.Pareto
 import Core.Traversal
@@ -58,6 +58,7 @@ heavyTests = [
   ]
 playground :: [IO Bool]
 playground = [
+              analyzeUpgradeFrequency furina "GoldenTroupe"
               --analyzeArtifactRankings 115
               --scanForParetoFailures  -- Run to find new failures
               --diagnoseParetoFailures paretoFailureSeeds  -- Diagnose known failures
@@ -114,25 +115,26 @@ foldingBestBuilds = do
 
     return valid
 
---analyzes real build upgrade potential
-analyzeUpgradeFrequency  :: IO Bool
-analyzeUpgradeFrequency  = go nefer 1000000 where
-  pairsToDays :: Int -> Double
-  pairsToDays n = fromIntegral n*40/180 --180 resin per day, 40 resin per artifact pair
-  printInfo :: Double -> (Piece, Int) -> IO ()
-  printInfo int (p,c) = putStrLn $ show p ++ ": " ++ show c ++ " (" ++ printf "%.0f" (int / fromIntegral (c+1)) ++ " days)"
-  go chr cnt= do
-    let interval = pairsToDays cnt
-    putStrLn ("Loading "++name chr++" build...")
-    artifacts <- readGOODForCharacter "data/Main_2026-02-03_11-27-42.json" (name chr)
-    putStrLn $ "Loaded " ++ show (length artifacts) ++ " artifacts"
-
-    results <- simulateUpgrades chr artifacts cnt
-
-    putStrLn "\nUpgrade frequency:"
-
-    mapM_ (printInfo interval) results
-    return True
+analyzeUpgradeFrequency :: Character -> String -> IO Bool
+analyzeUpgradeFrequency char setName = do
+  let goodFile = "data/Main_2026-02-03_11-27-42.json"
+  putStrLn $ "\n=== Upgrade Frequency Analysis for " ++ show (name char) ++ " ==="
+  putStrLn $ "Loading artifacts from " ++ goodFile ++ "..."
+  putStrLn "Running 10 simulations with 5000 generated artifacts each"
+  putStrLn ""
+  
+  -- Run simulation with character's preferred set
+  -- TODO: Need to know character's set name - using placeholder
+  let genCount = 5000
+      numRuns = 10
+  
+  stats <- simulateUpgrades char goodFile setName genCount numRuns
+  
+  putStrLn "\n=== Final Summary ==="
+  putStrLn $ "Total artifacts analyzed: " ++ show (length stats)
+  putStrLn $ "Artifacts that appeared in builds: " ++ show (length $ filter ((> 0) . usProbability) stats)
+  
+  return True
 
 testPartitionByPiece :: IO Bool
 testPartitionByPiece = do
