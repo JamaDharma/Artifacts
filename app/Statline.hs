@@ -13,7 +13,7 @@ data Statline = Statline
   , slCD  :: {-# UNPACK #-} !Double
   , slHB  :: {-# UNPACK #-} !Double
   , slDMG :: {-# UNPACK #-} !Double
-  } deriving (Show, Eq)
+  } deriving (Show, Eq, Ord)
 
 type Weightline = Statline
 
