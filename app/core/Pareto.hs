@@ -5,7 +5,7 @@ import Character
 import Statline
 import Core.Utils (ArtifactInfo(..))
 import Data.List.Extra (groupSortOn)
-import Data.Array (Array, accumArray)
+import Data.Array
 
 --partitioning
 --reverses order of elements while partitioning
@@ -20,28 +20,48 @@ partitionOnPiece f = partitionOnPieceR f . reverse
 --  (Optimized, uses Statline accessors and ArtifactInfo)
 -- ============================================================================
 
+-- | INTERNAL: One-pass pareto accumulation without reversal.
+-- Takes pre-accumulated filtered/forward lists and processes remaining items.
+-- Returns (forward, filtered) in REVERSE order - caller must reverse.
+-- DO NOT USE DIRECTLY unless you understand the accumulation order.
+paretoUnsafeAccum :: [Stat] -> (a->Statline) -> [a] -> [a] -> [a] -> ([a], [a])
+paretoUnsafeAccum scl getStatline filtered forward = go
+  where
+    go [] = (forward, filtered)
+    go (a:rest)
+      | isDominated = go rest
+      | otherwise = go' rest
+      where
+        slA = getStatline a
+        isDominated = any (\f -> dominates (getStatline f) slA) filtered
+        newFiltered = a : filter (not . dominates slA . getStatline) filtered
+        go' = paretoUnsafeAccum scl getStatline newFiltered (a:forward)
+        dominates slF slA' = all (\s -> statAccessor slF s >= statAccessor slA' s) scl
+
+    
+paretoOnPiece :: Character -> (a->ArtifactInfo) -> [a] -> [a] -> [a] -> ([a], [a])
+paretoOnPiece char getAI flt fwd items = (fwdResult, fullResult)
+  where
+    paretoRaw = paretoUnsafeAccum (scaling char) (aiStatline . getAI)
+    fltByPiece = partitionOnPiece (aiPiece . getAI) flt
+    fwdByPiece = partitionOnPiece (aiPiece . getAI) fwd
+    itemsByPiece = partitionOnPiece (aiPiece . getAI) items
+    allPieces = indices itemsByPiece
+    results = [paretoRaw (lookup p fltByPiece) (lookup p fwdByPiece) (itemsByPiece ! p)
+              | p <- allPieces]
+    lookup p arr = if inRange (bounds arr) p then arr ! p else []
+    fwdResult = concatMap fst results
+    fullResult = concatMap snd results
+
 -- | Core logic: Filters a list of ArtifactInfo.
 -- Returns a tuple: (Forward-Filtered List, Full Pareto Frontier)
 -- 1. Forward-Filtered: Preserves input order; keeps artifacts not dominated by those seen *before* them.
 -- 2. Pareto Frontier: The subset of artifacts that are strictly optimal (not dominated by *any* other).
 paretoBothOn :: Character -> (a->Statline) -> [a] -> ([a], [a])
-paretoBothOn c getStatline = go [] []
+paretoBothOn c getStatline items = (reverse forward, reverse filtered)
   where
     scl = scaling c
-    -- filtered: current pareto frontier (fully optimal)
-    -- forward: artifacts that passed forward-only filter (input order)
-    go filtered forward [] = (reverse forward, reverse filtered)
-    go filtered forward (a:rest)
-      | isDominated = go filtered forward rest
-      | otherwise = go newFiltered (a:forward) rest
-      where
-        slA = getStatline a
-        -- Check if 'a' is dominated by anything currently in the frontier
-        isDominated = any (\f -> dominates (getStatline f) slA) filtered
-        -- Remove things from the frontier that are now dominated by 'a'
-        newFiltered = a : filter (not . dominates slA . getStatline) filtered
-        -- f dominates a if f >= a on all scaling stats
-        dominates slF slA' = all (\s -> statAccessor slF s >= statAccessor slA' s) scl
+    (forward, filtered) = paretoUnsafeAccum scl getStatline [] [] items
 
 paretoFilterBothInfo :: Character -> [ArtifactInfo] -> ([ArtifactInfo], [ArtifactInfo])
 paretoFilterBothInfo c = paretoBothOn c aiStatline
