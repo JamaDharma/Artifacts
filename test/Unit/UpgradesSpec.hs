@@ -301,12 +301,12 @@ spec = do
       -- realInfo1: appears in runs 1,2 (not 3)
       usReplacementIndices stat1 `shouldBe` [100, 300]
       usProbability stat1 `shouldBe` (2.0 / 3.0)
-      usMedianReplacement stat1 `shouldBe` 200  -- median of [100, 300]
+      usMedianReplacement stat1 `shouldBe` 300  -- median of [100, 300] takes upper middle
       
       -- realInfo2: appears in runs 1,3 (not 2)
       usReplacementIndices stat2 `shouldBe` [200, 400]
       usProbability stat2 `shouldBe` (2.0 / 3.0)
-      usMedianReplacement stat2 `shouldBe` 300  -- median of [200, 400]
+      usMedianReplacement stat2 `shouldBe` 400  -- median of [200, 400] takes upper middle
     
     it "computes median correctly for even number of runs" $ do
       let art = mkTestArtifact Flower HP "TestSet"
@@ -335,5 +335,5 @@ spec = do
       
       usReplacementIndices result `shouldBe` []
       usMedianReplacement result `shouldBe` 0
-      usProbability result `shouldBe` 0.0  -- Would be NaN without guard
+      usProbability result `shouldBe` 0.0  -- Guard returns 0.0 instead of NaN
       usRating result `shouldBe` 0.0
