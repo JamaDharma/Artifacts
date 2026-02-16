@@ -21,7 +21,22 @@ data ArtifactInfo = ArtifactInfo
   , aiMainStat :: !Stat  -- first element of stats
   , aiStatline :: !Statline  -- normalized stats (artifact contribution only)
   , aiOriginal :: Artifact  -- for export/display
-  } deriving (Eq,Show)
+  } deriving (Show)
+-- Custom Eq that only uses set from Artifact when other fields are equal
+instance Eq ArtifactInfo where
+  a == b = 
+    aiPiece a == aiPiece b &&
+    aiMainStat a == aiMainStat b &&
+    aiStatline a == aiStatline b &&
+    set (aiOriginal a) == set (aiOriginal b)  -- Only compare set from Artifact
+
+-- Custom Ord that only uses set from Artifact when other fields are equal
+instance Ord ArtifactInfo where
+  compare a b = 
+    compare (aiPiece a) (aiPiece b) `mappend`
+    compare (aiMainStat a) (aiMainStat b) `mappend`
+    compare (aiStatline a) (aiStatline b) `mappend`
+    compare (set (aiOriginal a)) (set (aiOriginal b))
 
 type BuildInfo = [ArtifactInfo]
 type BuildComponents = [[ArtifactInfo]]  -- list of piece groups for one build variant
