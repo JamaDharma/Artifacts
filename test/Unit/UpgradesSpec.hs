@@ -225,3 +225,115 @@ spec = do
       
       -- Rating should reflect it's a hidden gem
       usRating stat3 `shouldBe` 500 * (2.0 / 3.0)
+  
+  describe "cross-run aggregation" $ do
+    it "aggregates multiple runs with different progression paths" $ do
+      let realArt1 = mkTestArtifact Flower HP "TestSet"
+          realArt2 = mkTestArtifact Plume ATK "TestSet"
+          realArt3 = mkTestArtifact Sands ER "TestSet"
+          
+          realInfo1 = toArtifactInfo undefined realArt1
+          realInfo2 = toArtifactInfo undefined realArt2
+          realInfo3 = toArtifactInfo undefined realArt3
+          
+          allRealInfo = [realInfo1, realInfo2, realInfo3]
+          
+          -- Run 1: realInfo1 replaced early, others last till end
+          prog1 = [(0, [realInfo1, realInfo2, realInfo3])
+                  ,(100, [realInfo2, realInfo3])
+                  ,(1000, [realInfo2, realInfo3])]
+          
+          -- Run 2: realInfo2 replaced mid-way
+          prog2 = [(0, [realInfo1, realInfo2, realInfo3])
+                  ,(500, [realInfo1, realInfo3])
+                  ,(1000, [realInfo1, realInfo3])]
+          
+          -- Run 3: All last till end
+          prog3 = [(0, [realInfo1, realInfo2, realInfo3])
+                  ,(1000, [realInfo1, realInfo2, realInfo3])]
+          
+          maps = [trackLastSeen prog1, trackLastSeen prog2, trackLastSeen prog3]
+          stats = aggregateStats allRealInfo maps
+      
+      length stats `shouldBe` 3
+      
+      let stat1 = stats !! 0  -- realInfo1
+          stat2 = stats !! 1  -- realInfo2
+          stat3 = stats !! 2  -- realInfo3
+      
+      -- realInfo1: [0, 1000, 1000] -> median 1000, prob 1.0
+      usReplacementIndices stat1 `shouldBe` [0, 1000, 1000]
+      usMedianReplacement stat1 `shouldBe` 1000
+      usProbability stat1 `shouldBe` 1.0
+      
+      -- realInfo2: [1000, 0, 1000] -> median 1000, prob 1.0
+      usReplacementIndices stat2 `shouldBe` [1000, 0, 1000]
+      usMedianReplacement stat2 `shouldBe` 1000
+      usProbability stat2 `shouldBe` 1.0
+      
+      -- realInfo3: [1000, 1000, 1000] -> median 1000, prob 1.0
+      usReplacementIndices stat3 `shouldBe` [1000, 1000, 1000]
+      usMedianReplacement stat3 `shouldBe` 1000
+      usProbability stat3 `shouldBe` 1.0
+    
+    it "handles artifacts missing from some run's maps" $ do
+      let realArt1 = mkTestArtifact Flower HP "TestSet"
+          realArt2 = mkTestArtifact Plume ATK "TestSet"
+          
+          realInfo1 = toArtifactInfo undefined realArt1
+          realInfo2 = toArtifactInfo undefined realArt2
+          
+          allRealInfo = [realInfo1, realInfo2]
+          
+          -- Run 1: Both artifacts appear
+          map1 = Map.fromList [(realInfo1, 100), (realInfo2, 200)]
+          
+          -- Run 2: Only realInfo1 appears
+          map2 = Map.singleton realInfo1 300
+          
+          -- Run 3: Only realInfo2 appears
+          map3 = Map.singleton realInfo2 400
+          
+          stats = aggregateStats allRealInfo [map1, map2, map3]
+          stat1 = stats !! 0
+          stat2 = stats !! 1
+      
+      -- realInfo1: appears in runs 1,2 (not 3)
+      usReplacementIndices stat1 `shouldBe` [100, 300]
+      usProbability stat1 `shouldBe` (2.0 / 3.0)
+      usMedianReplacement stat1 `shouldBe` 200  -- median of [100, 300]
+      
+      -- realInfo2: appears in runs 1,3 (not 2)
+      usReplacementIndices stat2 `shouldBe` [200, 400]
+      usProbability stat2 `shouldBe` (2.0 / 3.0)
+      usMedianReplacement stat2 `shouldBe` 300  -- median of [200, 400]
+    
+    it "computes median correctly for even number of runs" $ do
+      let art = mkTestArtifact Flower HP "TestSet"
+          artInfo = toArtifactInfo undefined art
+          
+          -- 4 runs with different indices
+          maps = [ Map.singleton artInfo 100
+                 , Map.singleton artInfo 200
+                 , Map.singleton artInfo 300
+                 , Map.singleton artInfo 400
+                 ]
+          
+          stats = aggregateStats [artInfo] maps
+          result = head stats
+      
+      -- Median of [100, 200, 300, 400] = 250 (implementation takes index length/2)
+      usMedianReplacement result `shouldBe` 300  -- Haskell's !! takes lower middle
+      usProbability result `shouldBe` 1.0
+    
+    it "handles empty maps list" $ do
+      let art = mkTestArtifact Flower HP "TestSet"
+          artInfo = toArtifactInfo undefined art
+          
+          stats = aggregateStats [artInfo] []
+          result = head stats
+      
+      usReplacementIndices result `shouldBe` []
+      usMedianReplacement result `shouldBe` 0
+      usProbability result `shouldBe` 0.0  -- Would be NaN without guard
+      usRating result `shouldBe` 0.0
