@@ -1,6 +1,7 @@
 module Main where
 
 import Artifact
+import Display (prettyPrint)
 import Character
 import CharacterLibrary
 import Core.Interface
@@ -27,15 +28,6 @@ padN n x = padding++xs where
 
 padShow :: Show a => a->String
 padShow = padN 10
-
-prettyPrint :: Artifact -> String
-prettyPrint a =
-  "\t"++ padN 7 (piece a) ++"\t"++ d2s (artCV a)
-    ++"\t"++ take 4 (set a)
-    ++"\t ln: "++ show (upNumber a - 1)
-    ++"\t RV: "++ show (artRV a * 10)
-    ++"\t"++
-  concatMap (\(s,v) -> "  " ++ padN 7 s ++ " " ++ d2s v ++ " ") (stats a)
 
 weightsToString ::[(Stat, Double)] -> String
 weightsToString = unwords.map w2s where

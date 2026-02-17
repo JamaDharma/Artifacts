@@ -2,6 +2,7 @@ module Main where
 
 import Control.Exception (evaluate)
 import Artifact
+import Display (prettyPrint)
 import Data.List (permutations,partition)
 import Data.List.Extra
 import Data.Array ((!), Array, listArray, array)
@@ -58,7 +59,8 @@ heavyTests = [
   ]
 playground :: [IO Bool]
 playground = [
-              analyzeUpgradeFrequency furina "GoldenTroupe"
+              --analyzeUpgradeFrequency furina "GoldenTroupe"
+              analyzeUpgradeFrequency nefer "NightOfTheSkysUnveiling"
               --analyzeArtifactRankings 115
               --scanForParetoFailures  -- Run to find new failures
               --diagnoseParetoFailures paretoFailureSeeds  -- Diagnose known failures

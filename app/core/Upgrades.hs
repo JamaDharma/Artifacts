@@ -2,6 +2,7 @@
 module Core.Upgrades where
 
 import Artifact
+import Display (prettyPrint)
 import Character
 import Core.Utils (toArtifactInfo, aiOriginal, BuildInfo, ArtifactInfo (..))
 import Core.SearchEngine (bestBuildInfo)
@@ -170,14 +171,7 @@ formatStatsTable stats =
       padRight 8 (show $ round $ usRating us) ++ " | " ++
       padRight 8 (show $ usMedianReplacement us) ++ " | " ++
       padRight 6 (printf "%.2f" $ usProbability us) ++ " | " ++
-      formatArtifact (usArtifact us)
-
-    -- Format artifact: Piece MainStat CV:XX.X
-    formatArtifact :: ArtifactInfo -> String
-    formatArtifact artInfo =
-      let art = aiOriginal artInfo
-      in show (piece art) ++ " " ++
-         "CV:" ++ printf "%.1f" (artCV art)
+      prettyPrint (aiOriginal $ usArtifact us)
 
     padRight :: Int -> String -> String
     padRight n s = s ++ replicate (n - length s) ' '
