@@ -35,25 +35,17 @@ buffStatline sl s val = appendStats sl [(s, val)]
 -- WEIGHT CALCULATION
 -- Calculate sensitivity: damage change per roll of stat
 -- Uses ±17 rolls (≈2 good rolls) to measure slope
-calcSensitivity :: (Statline -> Double) -> [Statline] -> Stat -> Double
-calcSensitivity dmgCalc statlines s = (plusDmg - minusDmg) / baseDmg * 100 / 4 where
-  baseDmg  = maximum (map dmgCalc statlines)
+calcSensitivity :: (Statline -> Double) -> [Statline] -> Double -> Stat -> Double
+calcSensitivity dmgCalc statlines baseDmg s = (plusDmg - minusDmg) / baseDmg * 100 / 4 where
   plusDelta  = snd $ statRollToValue (s,  17)
   minusDelta = snd $ statRollToValue (s, -17)
   plusDmg  = maximum $ map (\sl -> dmgCalc (buffStatline sl s plusDelta)) statlines
   minusDmg = maximum $ map (\sl -> dmgCalc (buffStatline sl s minusDelta)) statlines
 
--- Balanced weights updater - simple sensitivity analysis
-calcStatWeightsBInfo :: Character -> [BuildInfo] -> [(Stat, Double)] -> [(Stat, Double)]
-calcStatWeightsBInfo c builds = map updateW where
+calcStatWeightsStatlines :: Character -> [Statline] -> Double -> [(Stat, Double)] -> [(Stat, Double)]
+calcStatWeightsStatlines c statlines baseDmg = map updateW where
   dmgCalc = statlineDamageCalculator c
-  statlines = buildStatlinesInfo c builds
-  updateW (s, _) = (s, calcSensitivity dmgCalc statlines s)
-
-calcStatWeightsStatlines :: Character -> [Statline] -> [(Stat, Double)] -> [(Stat, Double)]
-calcStatWeightsStatlines c statlines = map updateW where
-  dmgCalc = statlineDamageCalculator c
-  updateW (s, _) = (s, calcSensitivity dmgCalc statlines s)
+  updateW (s, _) = (s, calcSensitivity dmgCalc statlines baseDmg s)
 
 -- Constraint-aware weights calculation
 constraintRange :: (Ord a, Fractional a) => a -> a -> a -> (a, a)
@@ -83,15 +75,15 @@ constraintSlope c statlines (cs,cv) = (cs, if dmg minRD == dmg maxRD then cv els
 -- Constraints weights updater - experimental
 -- Uses constraint-aware analysis when character has stat constraints (e.g., Furina HP threshold)
 -- Falls back to all builds if no valid builds exist, allowing weight estimation even with poor gear
-calcStatWeightsCInfo :: Character -> [BuildInfo] -> [(Stat,Double)] -> [(Stat,Double)]
-calcStatWeightsCInfo c builds = map updateW where
+calcStatWeightsCInfo :: Character -> [BuildInfo] -> Double -> [(Stat,Double)] -> [(Stat,Double)]
+calcStatWeightsCInfo c builds baseDmg = map updateW where
   allStatlines = buildStatlinesInfo c builds
   validStatlines = filter (conditionChecker c) allStatlines
   -- Use valid builds if any, else all (enables weight calc even when no builds meet constraints)
   statlines = if null validStatlines then allStatlines else validStatlines
   dmgCalc = stDmgClcUnc c
   updateW (s, oldW)
-    | null cnd = (s, calcSensitivity dmgCalc statlines s)
+    | null cnd = (s, calcSensitivity dmgCalc statlines baseDmg s)
     | otherwise = constraintSlope c allStatlines (head cnd)
     where cnd = filter ((==s).fst) (condition c)
 
@@ -118,7 +110,7 @@ bestBuildInfo n c setA offA = bb where
     | otherwise = --trace (showAll "Improved -" (oldMax, oldRollW))$trace (showAll "Failed to -" (newMax, newRollW))$
       (oldBest, oldRollW)
     where
-      newRollW = calcStatWeightsStatlines c oldBuilds oldRollW
+      newRollW = calcStatWeightsStatlines c oldBuilds oldMax oldRollW
       newWL = rollsToWeightline newRollW
       news@((_, newMax), _) = bmkr newWL
 
