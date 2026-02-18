@@ -33,10 +33,11 @@ buildStatlinesInfo c = map (buildInfoToStatline c)
 -- Uses ±17 rolls (≈2 good rolls) to measure slope
 calcSensitivity :: (Statline -> Double) -> [Statline] -> Double -> Stat -> Double
 calcSensitivity dmgCalc statlines baseDmg s = (plusDmg - minusDmg) / baseDmg * 100 / 4 where
+  maxOf f = foldl' (\acc x -> max acc (f x)) (-1/0)
   plusDelta  = snd $ statRollToValue (s,  17)
   minusDelta = snd $ statRollToValue (s, -17)
-  plusDmg  = maximum $ map (\sl -> dmgCalc (amendStatline sl s plusDelta)) statlines
-  minusDmg = maximum $ map (\sl -> dmgCalc (amendStatline sl s minusDelta)) statlines
+  plusDmg  = maxOf (\sl -> dmgCalc (amendStatline sl s plusDelta)) statlines
+  minusDmg = maxOf (\sl -> dmgCalc (amendStatline sl s minusDelta)) statlines
 
 calcStatWeightsStatlines :: Character -> [Statline] -> Double -> [(Stat, Double)] -> [(Stat, Double)]
 calcStatWeightsStatlines c statlines baseDmg = map updateW where
