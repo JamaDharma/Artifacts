@@ -47,25 +47,7 @@ statAccessor sl stat = case stat of
 zeroStatline :: Statline
 zeroStatline = Statline 0 0 0 0 0 0 0 0 0
 
-{-# INLINE appendStats #-}
-appendStats :: Statline -> [(Stat, Double)] -> Statline
-appendStats = foldl' addStat
-  where
-    addStat sl (stat, val) = case stat of
-      HP  -> sl { slHP  = slHP sl + val }
-      ATK -> sl { slATK = slATK sl + val }
-      DEF -> sl { slDEF = slDEF sl + val }
-      ER  -> sl { slER  = slER sl + val }
-      EM  -> sl { slEM  = slEM sl + val }
-      CR  -> sl { slCR  = slCR sl + val }
-      CD  -> sl { slCD  = slCD sl + val }
-      HB  -> sl { slHB  = slHB sl + val }
-      DMG -> sl { slDMG = slDMG sl + val }
-      HPf  -> error "Flat stats should not be used as buffs"
-      ATKf -> error "Flat stats should not be used as buffs"
-      DEFf -> error "Flat stats should not be used as buffs"
-      DMGb -> error "DMGb is not used"
-
+{-# INLINE addStatlines #-}
 addStatlines :: Statline -> Statline -> Statline
 addStatlines sl1 sl2 = Statline
   { slHP  = slHP sl1 + slHP sl2
@@ -78,3 +60,22 @@ addStatlines sl1 sl2 = Statline
   , slHB  = slHB sl1 + slHB sl2
   , slDMG = slDMG sl1 + slDMG sl2
   }
+
+{-# INLINE amendStatline #-}
+amendStatline :: Statline -> Stat -> Double -> Statline
+amendStatline sl s delta = case s of
+  HP  -> sl { slHP  = slHP  sl + delta }
+  ATK -> sl { slATK = slATK sl + delta }
+  DEF -> sl { slDEF = slDEF sl + delta }
+  ER  -> sl { slER  = slER  sl + delta }
+  EM  -> sl { slEM  = slEM  sl + delta }
+  CR  -> sl { slCR  = slCR  sl + delta }
+  CD  -> sl { slCD  = slCD  sl + delta }
+  HB  -> sl { slHB  = slHB  sl + delta }
+  DMG -> sl { slDMG = slDMG sl + delta }
+  _   -> sl
+
+{-# INLINE appendStats #-}
+appendStats :: Statline -> [(Stat, Double)] -> Statline
+appendStats = foldl' addStat
+  where addStat sl (stat, val) = amendStatline sl stat val

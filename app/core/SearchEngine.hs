@@ -28,10 +28,6 @@ buildInfoToStatline c buildInfo = addStatlines charStats artifactStats where
 buildStatlinesInfo :: Character -> [BuildInfo] -> [Statline]
 buildStatlinesInfo c = map (buildInfoToStatline c)
 
--- Apply single-stat buff to statline
-buffStatline :: Statline -> Stat -> Double -> Statline
-buffStatline sl s val = appendStats sl [(s, val)]
-
 -- WEIGHT CALCULATION
 -- Calculate sensitivity: damage change per roll of stat
 -- Uses ±17 rolls (≈2 good rolls) to measure slope
@@ -39,8 +35,8 @@ calcSensitivity :: (Statline -> Double) -> [Statline] -> Double -> Stat -> Doubl
 calcSensitivity dmgCalc statlines baseDmg s = (plusDmg - minusDmg) / baseDmg * 100 / 4 where
   plusDelta  = snd $ statRollToValue (s,  17)
   minusDelta = snd $ statRollToValue (s, -17)
-  plusDmg  = maximum $ map (\sl -> dmgCalc (buffStatline sl s plusDelta)) statlines
-  minusDmg = maximum $ map (\sl -> dmgCalc (buffStatline sl s minusDelta)) statlines
+  plusDmg  = maximum $ map (\sl -> dmgCalc (amendStatline sl s plusDelta)) statlines
+  minusDmg = maximum $ map (\sl -> dmgCalc (amendStatline sl s minusDelta)) statlines
 
 calcStatWeightsStatlines :: Character -> [Statline] -> Double -> [(Stat, Double)] -> [(Stat, Double)]
 calcStatWeightsStatlines c statlines baseDmg = map updateW where

@@ -17,9 +17,9 @@ import Data.Array ( (!) )
 
 --structure for high performance core
 data ArtifactInfo = ArtifactInfo
-  { aiPiece :: !Piece
-  , aiMainStat :: !Stat  -- first element of stats
-  , aiStatline :: !Statline  -- normalized stats (artifact contribution only)
+  { aiPiece :: {-# UNPACK #-} !Piece
+  , aiMainStat :: {-# UNPACK #-} !Stat  -- first element of stats
+  , aiStatline :: {-# UNPACK #-} !Statline  -- normalized stats (artifact contribution only)
   , aiOriginal :: Artifact  -- for export/display
   } deriving (Show)
 -- Custom Eq that only uses set from Artifact when other fields are equal
