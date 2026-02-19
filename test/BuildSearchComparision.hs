@@ -69,31 +69,32 @@ findMinDepth bf seed targetDamage maxDepth = do
             diff = damage (bf depth setA offA) - targetDamage
     return $ tryDepth 1
 
-printRegressionTable :: String -> [(Int, Int, Double)] -> IO ()
+printRegressionTable :: String -> [(Int, Int, Double)] -> IO (String)
 printRegressionTable suiteName results = do
-    putStrLn $ "\nSuite: " ++ suiteName
-    putStrLn "Depth | Count | Seeds"
-    putStrLn "----------------------"
-    let indexed = map formatResult results
+    let header = "\nSuite: " ++ suiteName ++ "\nDepth | Count | Seeds\n----------------------"
+        indexed = map formatResult results
         grouped = groupSortOn snd indexed
         groupToRow g = (snd $ head g, length g, map fst g)
-    mapM_ (printRow . groupToRow) grouped
+        rows = map (rowStr . groupToRow) grouped
+        report = unlines (header : rows)
+    putStr report
+    return report
   where
+    rowStr (depthStr, count, seeds) =
+        showPadded depthStr ++ "| " ++ showPadded (show count) ++ "| " ++ showSeeds seeds
     formatResult (seed, depth, diff)
         | diff >= 0.1 = (seed, show depth ++ "*")
         | otherwise = (seed, show depth)
     showPadded str = str ++ replicate (6 - length str) ' '
-    printRow (depthStr, count, seeds) =
-        putStrLn $ showPadded depthStr ++ "| " ++ showPadded (show count) ++ "| " ++ showSeeds seeds
     showSeeds ss
         | length ss <= 5 = show ss
         | otherwise = show (take 3 ss) ++ "..." ++ show (reverse $ take 2 $ reverse ss)
 
-testBuildMakerRegression :: [(Double, String, [(Int, Double)])] -> IO Bool
-testBuildMakerRegression testCases = do
+testBuildMakerRegression :: String -> [(Double, String, [(Int, Double)])] -> IO Bool
+testBuildMakerRegression fileName testCases = do
     let pf = paretoFilterReal regTestChr
-    let bf depth = bestBuildNew depth regTestChr
-    --let bf d set off = bestBuildNew d regTestChr (pf set) (pf off)
+        --bf d = bestBuildNew d regTestChr
+        bf d set off = bestBuildNew d regTestChr (pf set) (pf off)
         maxDepth = 15
         fmd (seed,target) = do
             (dp,df) <- findMinDepth bf seed target maxDepth
@@ -104,7 +105,10 @@ testBuildMakerRegression testCases = do
             return (seed, dp, df)
         runSuite (_, name, refData) = do
             results <- mapM fmd refData
-            printRegressionTable name results
-            return $ all (\(_, d, _) -> d /= -1) results
-    results <- mapM runSuite testCases
-    return $ and results
+            report <- printRegressionTable name results
+            return (all (\(_, d, _) -> d /= -1) results, report)
+    suiteResults <- mapM runSuite testCases
+    let (passed, reports) = unzip suiteResults
+        fullReport = concat reports
+    writeFile ("test/reports/" ++ fileName) fullReport
+    return $ and passed

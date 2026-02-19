@@ -54,19 +54,19 @@ regressionTests = [
 heavyTests :: [IO Bool]
 heavyTests = [
     --measureAndRecordX --for data generation
-    --testBuildMakerRegression smallSet
-    --testBuildMakerRegression largeSet
+    --testBuildMakerRegression "ParetoSmall.txt" smallSet,
+    --testBuildMakerRegression "ParetoLarge.txt" largeSet
   ]
 playground :: [IO Bool]
 playground = [
               --analyzeUpgradeFrequency furina "GoldenTroupe"
-              analyzeUpgradeFrequency nefer "NightOfTheSkysUnveiling"
+              --analyzeUpgradeFrequency nefer "NightOfTheSkysUnveiling"
+              measureProgression bestBuildInfo
               --analyzeArtifactRankings 115
               --scanForParetoFailures  -- Run to find new failures
               --diagnoseParetoFailures paretoFailureSeeds  -- Diagnose known failures
               --testMinimisation
               --foldingBestBuilds,
-              --measureProgression bestBuildInfo
               --measureAndRecordX
               --testWeightProgression
               --testWeightComparison
@@ -120,15 +120,12 @@ foldingBestBuilds = do
 analyzeUpgradeFrequency :: Character -> String -> IO Bool
 analyzeUpgradeFrequency char setName = do
   let goodFile = "data/Main_2026-02-03_11-27-42.json"
+      genCount = 5000
+      numRuns = 50
   putStrLn $ "\n=== Upgrade Frequency Analysis for " ++ show (name char) ++ " ==="
   putStrLn $ "Loading artifacts from " ++ goodFile ++ "..."
-  putStrLn "Running 10 simulations with 5000 generated artifacts each"
+  putStrLn $"Running "++show numRuns++" simulations with "++show genCount++" generated artifacts each"
   putStrLn ""
-  
-  -- Run simulation with character's preferred set
-  -- TODO: Need to know character's set name - using placeholder
-  let genCount = 5000
-      numRuns = 10
   
   stats <- simulateUpgrades char goodFile setName genCount numRuns
   
