@@ -35,6 +35,7 @@ simpleMult sl = critMult sl*dmgMlt where
 furina :: Character
 furina = Character{
    name = "Furina",
+   element = HydroD,
    scaling = [ER,HP,CR,CD,DMG],
    baseS  = baseStats [(HP,15307)],
    --baseS  = baseStats [(HP,14553)],
@@ -57,6 +58,7 @@ furinaStatlineDmgClc c = innerDmg where
 nefer :: Character
 nefer = Character{
    name = "Nefer",
+   element = DendroD,
    scaling = [EM, CR, CD],
    baseS  = baseStats [],  -- no base stats needed (EM/CR/CD don't use them)
    displS = [(EM, 100+80), (CR, 5+30), (CD, 50+38.4+55.1)],

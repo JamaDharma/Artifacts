@@ -38,10 +38,7 @@ statAccessor sl stat = case stat of
   CD  -> slCD sl
   HB  -> slHB sl
   DMG -> slDMG sl
-  HPf  -> error "Flat stats should be normalized before Statline creation"
-  ATKf -> error "Flat stats should be normalized before Statline creation"
-  DEFf -> error "Flat stats should be normalized before Statline creation"
-  DMGb -> error "DMGb is not used"
+  _ -> error $ "Attempt to access illegal stat in Statline: " ++ show stat
 
 {-# INLINE zeroStatline #-}
 zeroStatline :: Statline

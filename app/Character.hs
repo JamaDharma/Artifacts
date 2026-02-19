@@ -14,6 +14,7 @@ import Data.Array
 
 data Character = Character
   { name     :: String
+  , element  :: Stat
   , scaling  :: [Stat]
   , baseS    :: Array Stat Double--base values flat HP ATK DEF
   , displS   :: [(Stat, Double)]--values

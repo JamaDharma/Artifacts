@@ -7,7 +7,11 @@ module Artifact (
 import Data.Array
 
 data Piece = Flower|Plume|Goblet|Sands|Circlet deriving (Show,Eq,Ord,Enum,Bounded,Ix)
-data Stat = HPf|ATKf|DEFf|HP|ATK|DEF|ER|EM|CR|CD|HB|DMG|DMGb deriving (Show,Eq,Ord,Enum,Bounded,Ix)
+data Stat = HPf|ATKf|DEFf|HP|ATK|DEF|ER|EM|CR|CD|HB
+          | PhysD|AnemoD|GeoD|ElectroD|HydroD|PyroD|CryoD|DendroD
+          | DMG  -- character's element DMG (internal only)
+          | DMGb -- DEPRECATED: wrong-element bonus placeholder, to be removed
+          deriving (Show,Eq,Ord,Enum,Bounded,Ix)
 
 type Build = [Artifact]
 
@@ -19,7 +23,10 @@ statValue = array (HPf, DMGb) [
     (HPf,298.75),(ATKf,19.45),(DEFf,23.15),
     (HP,5.83),(ATK,5.83),(DEF,7.29),
     (ER,6.48),(EM,23.31),(CR,3.89),(CD,7.77),
-    (HB,4.49),(DMG,5.83),(DMGb,5.83)
+    (HB,4.49),
+    (PhysD,7.29),(AnemoD,5.83),(GeoD,5.83),(ElectroD,5.83),
+    (HydroD,5.83),(PyroD,5.83),(CryoD,5.83),(DendroD,5.83),
+    (DMG,5.83),(DMGb,5.83)
     ]
 
 flatMap :: Array Stat Stat

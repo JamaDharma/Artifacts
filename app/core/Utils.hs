@@ -11,7 +11,7 @@ module Core.Utils
 
 import Artifact
 import Character
-import Statline 
+import Statline
 import Data.List (foldl')
 import Data.Array ( (!) )
 
@@ -24,7 +24,7 @@ data ArtifactInfo = ArtifactInfo
   } deriving (Show)
 -- Custom Eq that only uses set from Artifact when other fields are equal
 instance Eq ArtifactInfo where
-  a == b = 
+  a == b =
     aiPiece a == aiPiece b &&
     aiMainStat a == aiMainStat b &&
     aiStatline a == aiStatline b &&
@@ -32,7 +32,7 @@ instance Eq ArtifactInfo where
 
 -- Custom Ord that only uses set from Artifact when other fields are equal
 instance Ord ArtifactInfo where
-  compare a b = 
+  compare a b =
     compare (aiPiece a) (aiPiece b) `mappend`
     compare (aiMainStat a) (aiMainStat b) `mappend`
     compare (aiStatline a) (aiStatline b) `mappend`
@@ -64,19 +64,11 @@ collectStatsNormalized c statList = foldl' addStat zeroStatline normalized
       | s == HPf  = flatToP HP v
       | s == ATKf = flatToP ATK v
       | s == DEFf = flatToP DEF v
-      | s == DMGb = []  -- drop it
+      | s `elem` [PhysD,AnemoD,GeoD,ElectroD,HydroD,PyroD,CryoD,DendroD]
+                  = [(DMG, v) | s == element c]
+      | s == DMGb = []  -- DEPRECATED placeholder, drop it
       | otherwise = [(s, v)]
-    addStat sl (stat, val) = case stat of
-      HP  -> sl { slHP  = slHP sl + val }
-      ATK -> sl { slATK = slATK sl + val }
-      DEF -> sl { slDEF = slDEF sl + val }
-      ER  -> sl { slER  = slER sl + val }
-      EM  -> sl { slEM  = slEM sl + val }
-      CR  -> sl { slCR  = slCR sl + val }
-      CD  -> sl { slCD  = slCD sl + val }
-      HB  -> sl { slHB  = slHB sl + val }
-      DMG -> sl { slDMG = slDMG sl + val }
-      _   -> sl  -- HPf/ATKf/DEFf/DMGb ignored
+    addStat sl (stat, val) = amendStatline sl stat val
 
 -- Convert roll weights to value Weightline (for core optimization)
 -- Core assumes stats are already normalized (no HPf/ATKf/DEFf)
@@ -99,10 +91,7 @@ rollsToWeightline = foldl' addWeight zeroStatline
         CD  -> wl { slCD  = slCD wl + valueW }
         HB  -> wl { slHB  = slHB wl + valueW }
         DMG -> wl { slDMG = slDMG wl + valueW }
-        HPf  -> error "Flat stats should not appear in core weights"
-        ATKf -> error "Flat stats should not appear in core weights"
-        DEFf -> error "Flat stats should not appear in core weights"
-        DMGb -> error "DMGb not used in weights"
+        _ -> error $ "Illegal stat added to weightline: " ++ show stat
 
 -- Default starting weights (1.0 per roll for each scaling stat)
 defaultWeightline :: Character -> Weightline

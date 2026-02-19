@@ -77,13 +77,16 @@ statList = fromLists
   , ("critRate_", CR)
   , ("critDMG_", CD)
   , ("heal_", HB)
+  , ("physical_dmg_", PhysD), ("anemo_dmg_", AnemoD), ("geo_dmg_", GeoD)
+  , ("electro_dmg_", ElectroD), ("hydro_dmg_", HydroD), ("pyro_dmg_", PyroD)
+  , ("cryo_dmg_", CryoD), ("dendro_dmg_", DendroD)
   , ("dmg_", DMG)
-  , ("dmgBonus_", DMGb)
+  , ("dmgWrong_", DMGb)
   ]
 parseStat :: String -> Stat
-parseStat key = case Map.lookup key (forwardMap statList) of
+parseStat k = case Map.lookup k (forwardMap statList) of
   Just stat -> stat
-  Nothing   -> if key == "hydro_dmg_" then DMG else DMGb
+  Nothing   -> error $ "Unknown stat key: " ++ k
 encodeStat :: Stat -> String
 encodeStat = (backwardMap statList Map.!)
 
