@@ -1,15 +1,15 @@
-Fix
-* GOOD import/export
 Algorithmic optimization
 * Per mainstat search to improve convergence
 * Floor for sum of artifact scores to deepen search
 * Add best single stat artifacts
 * Some simple lagrangian solver
 Low level optimization
-* Vector statlines
+* Vector statlines - linear V6
 * Store builds prepartitioned
 Refactoring
 * Split build info - forgot what it meant T_T
 * Make best build informasion struct that will store build info max damage statline
 Test
 * Investigation tool for single case
+Fix/Feature
+* Artifacts generation produses DMG and DMGb. Can do it normally now, but it is not important.
