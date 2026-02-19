@@ -13,7 +13,7 @@ import Artifact
 import Character
 import Statline
 import Data.List (foldl')
-import Data.Array ( (!) )
+import Data.Array ( (!), inRange )
 
 --structure for high performance core
 data ArtifactInfo = ArtifactInfo
@@ -64,8 +64,7 @@ collectStatsNormalized c statList = foldl' addStat zeroStatline normalized
       | s == HPf  = flatToP HP v
       | s == ATKf = flatToP ATK v
       | s == DEFf = flatToP DEF v
-      | s `elem` [PhysD,AnemoD,GeoD,ElectroD,HydroD,PyroD,CryoD,DendroD]
-                  = [(DMG, v) | s == element c]
+      | inRange (PhysD, DendroD) s = [(DMG, v) | s == element c]
       | s == DMGb = []  -- DEPRECATED placeholder, drop it
       | otherwise = [(s, v)]
     addStat sl (stat, val) = amendStatline sl stat val
