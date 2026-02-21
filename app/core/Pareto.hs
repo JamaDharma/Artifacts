@@ -8,6 +8,17 @@ import Data.List.Extra (groupSortOn)
 import Data.Array
 
 --partitioning
+
+data PiecePool a = PiecePool
+  { ppOnSet  :: Array Piece [a]
+  , ppOffSet :: Array Piece [a]
+  } deriving (Show)
+
+-- | Apply f to every piece group in both arrays
+mapPool :: ([a] -> [b]) -> PiecePool a -> PiecePool b
+mapPool f (PiecePool on off) = PiecePool (fmapArr f on) (fmapArr f off)
+  where fmapArr g arr = listArray (bounds arr) (map g (elems arr))
+
 --reverses order of elements while partitioning
 partitionOnPieceR :: (a -> Piece) -> [a] -> Array Piece [a]
 partitionOnPieceR f = accumArray (flip (:)) [] (Flower,Circlet) . map (\x -> (f x, x))
